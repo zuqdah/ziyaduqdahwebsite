@@ -189,8 +189,9 @@ section+section{border-top:1px solid var(--rule);}
 .contact h2{color:var(--band-ink);font-size:clamp(1.85rem,4vw,2.7rem);letter-spacing:-.03em;}
 .contact p.lede{color:var(--band-muted);max-width:var(--prose);margin-top:var(--s2);font-size:1.04rem;}
 .contact .eyebrow{color:var(--band-accent);}
-.clist{margin-top:var(--s4);display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);}
-@media (max-width:780px){.clist{grid-template-columns:1fr;}}
+.clist{margin-top:var(--s4);display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s2);}
+@media (max-width:1000px){.clist{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:560px){.clist{grid-template-columns:1fr;}}
 .clist a{background:var(--band-2);border:1px solid var(--band-rule);border-radius:var(--r);padding:var(--s3);display:flex;flex-direction:column;gap:.3rem;color:var(--band-ink);transition:border-color .16s ease;}
 .clist a:hover{border-color:var(--band-accent);color:var(--band-accent);}
 .clist span{font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--band-muted);}
@@ -515,7 +516,7 @@ footer a:hover{color:var(--band-accent);}
     </div>
 
     <div class="notice">
-      <p><strong>Placeholder content.</strong> These four tracks are scaffolding while the lab environments are being built out. Each card will be replaced with the real build: architecture diagram, infrastructure-as-code repository, and a written summary of what was proven.</p>
+      <p><strong>Placeholder content.</strong> These four tracks are scaffolding while the lab environments are being built out. Each card will be replaced with the real build: architecture diagram, infrastructure-as-code repository, and a written summary of what was proven. Builds are published on <a href="https://github.com/zuqdah" rel="me noopener" target="_blank">GitHub</a> as they land.</p>
     </div>
 
     <div class="grid-2">
@@ -633,6 +634,10 @@ footer a:hover{color:var(--band-accent);}
         <span>LinkedIn</span>
         <b>linkedin.com/in/ziyaduqdah</b>
       </a>
+      <a href="https://github.com/zuqdah" rel="me noopener" target="_blank">
+        <span>GitHub</span>
+        <b>github.com/zuqdah</b>
+      </a>
       <a href="/Ziyad_Uqdah_Resume.pdf">
         <span>Resume</span>
         <b>Download PDF</b>
@@ -645,7 +650,7 @@ footer a:hover{color:var(--band-accent);}
 <footer>
   <div class="wrap frow">
     <span>&copy; <span id="yr">2026</span> Ziyad Uqdah · New Orleans, LA</span>
-    <span><a href="mailto:ziyad@ziyaduqdah.com">ziyad@ziyaduqdah.com</a> · <a href="https://www.linkedin.com/in/ziyaduqdah" rel="me noopener" target="_blank">LinkedIn</a></span>
+    <span><a href="mailto:ziyad@ziyaduqdah.com">ziyad@ziyaduqdah.com</a> · <a href="https://www.linkedin.com/in/ziyaduqdah" rel="me noopener" target="_blank">LinkedIn</a> · <a href="https://github.com/zuqdah" rel="me noopener" target="_blank">GitHub</a></span>
   </div>
 </footer>
 
@@ -659,7 +664,7 @@ footer a:hover{color:var(--band-accent);}
   "jobTitle": "Senior Systems Engineer",
   "description": "Senior Systems Engineer with 19+ years across systems administration, infrastructure engineering, and cloud architecture, focused on Azure and hybrid cloud, enterprise migrations, SQL Server and data platforms, and tested disaster recovery.",
   "address": { "@type": "PostalAddress", "addressLocality": "New Orleans", "addressRegion": "LA", "addressCountry": "US" },
-  "sameAs": ["https://www.linkedin.com/in/ziyaduqdah"],
+  "sameAs": ["https://www.linkedin.com/in/ziyaduqdah", "https://github.com/zuqdah"],
   "alumniOf": [
     { "@type": "CollegeOrUniversity", "name": "Franklin University" },
     { "@type": "CollegeOrUniversity", "name": "Jones County Junior College" }
