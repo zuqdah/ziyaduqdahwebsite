@@ -159,9 +159,28 @@ section+section{border-top:1px solid var(--rule);}
 .job li.win::before{background:var(--accent);}
 
 /* ================= LABS ================= */
-.notice{background:var(--accent-wash);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);margin-bottom:var(--s4);}
-.notice p{font-size:.94rem;color:var(--ink-2);max-width:var(--prose);}
-.notice strong{color:var(--ink);font-weight:700;}
+.gh{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);box-shadow:var(--shadow-1);}
+.gh-head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);}
+.gh-avatar{width:48px;height:48px;border-radius:50%;border:1px solid var(--rule);background:var(--surface-2);flex:none;}
+.gh-id{display:flex;flex-direction:column;line-height:1.3;min-width:0;}
+.gh-id b{font-size:1.02rem;font-weight:700;letter-spacing:-.02em;color:var(--ink);}
+.gh-id a{font-size:.84rem;font-weight:500;}
+.gh-meta{font-size:.82rem;font-weight:500;color:var(--ink-3);}
+.gh-head .btn{margin-left:auto;}
+@media (max-width:560px){.gh-head .btn{margin-left:0;width:100%;}}
+.gh-empty{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--rule);font-size:.93rem;color:var(--ink-2);max-width:var(--prose);}
+.gh-repos{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--rule);display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s2);}
+@media (max-width:700px){.gh-repos{grid-template-columns:1fr;}}
+.gh-repos[hidden],.gh-empty[hidden]{display:none;}
+.repo{display:flex;flex-direction:column;gap:.5rem;background:var(--ground);border:1px solid var(--rule);border-radius:var(--r-sm);padding:var(--s2) var(--s3);color:var(--ink);transition:border-color .16s ease;}
+.repo:hover{border-color:var(--accent);color:var(--ink);}
+.repo-name{font-size:.98rem;font-weight:700;letter-spacing:-.015em;color:var(--accent);word-break:break-word;}
+.repo p{font-size:.9rem;color:var(--ink-2);}
+.repo-topics{display:flex;flex-wrap:wrap;gap:.35rem;}
+.repo-foot{margin-top:auto;display:flex;flex-wrap:wrap;gap:.3rem var(--s2);font-size:.78rem;font-weight:500;color:var(--ink-3);}
+.repo-foot .lang{display:inline-flex;align-items:center;gap:.4rem;}
+.repo-foot .lang i{width:9px;height:9px;border-radius:50%;display:block;}
+.sub-head{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:var(--s5) 0 var(--s3);}
 .lab{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);display:flex;flex-direction:column;gap:.65rem;box-shadow:var(--shadow-1);}
 .lab .status{display:inline-flex;align-items:center;gap:.45rem;font-size:.72rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);}
 .lab .status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;}
@@ -515,10 +534,21 @@ footer a:hover{color:var(--band-accent);}
       <p>Production experience is the record. These are the environments I stand up on my own time to keep the reference architectures current — and to have something to point at rather than describe.</p>
     </div>
 
-    <div class="notice">
-      <p><strong>Placeholder content.</strong> These four tracks are scaffolding while the lab environments are being built out. Each card will be replaced with the real build: architecture diagram, infrastructure-as-code repository, and a written summary of what was proven. Builds are published on <a href="https://github.com/zuqdah" rel="me noopener" target="_blank">GitHub</a> as they land.</p>
+    <div class="gh" id="gh">
+      <div class="gh-head">
+        <img class="gh-avatar" src="https://github.com/zuqdah.png?size=96" alt="" width="48" height="48" loading="lazy">
+        <div class="gh-id">
+          <b>zuqdah</b>
+          <a href="https://github.com/zuqdah" rel="me noopener" target="_blank">github.com/zuqdah</a>
+        </div>
+        <span class="gh-meta" id="gh-meta" aria-live="polite"></span>
+        <a class="btn btn-ghost" href="https://github.com/zuqdah" rel="me noopener" target="_blank">View on GitHub</a>
+      </div>
+      <div class="gh-repos" id="gh-repos" hidden></div>
+      <p class="gh-empty" id="gh-empty">Published labs appear here automatically as each build lands on GitHub — every repository ships with its architecture diagram, infrastructure-as-code, and a written summary of what was proven.</p>
     </div>
 
+    <h3 class="sub-head">In the pipeline</h3>
     <div class="grid-2">
       <div class="lab">
         <span class="status">In build</span>
@@ -685,6 +715,56 @@ footer a:hover{color:var(--band-accent);}
     try{localStorage.setItem('zu-theme',next);}catch(e){}
   });}
   var y=document.getElementById('yr'); if(y){y.textContent=new Date().getFullYear();}
+})();
+</script>
+
+<script>
+/* GitHub labs feed: lists public repos tagged with the "portfolio-lab" topic.
+   Tag a repo on GitHub and it appears here; untag it to remove it. */
+(function(){
+  var USER='zuqdah', TOPIC='portfolio-lab', KEY='zu-gh-repos', TTL=10*60*1000;
+  var box=document.getElementById('gh-repos'), empty=document.getElementById('gh-empty'), meta=document.getElementById('gh-meta');
+  if(!box||!window.fetch){return;}
+  var LANG={'HCL':'#844FBA','PowerShell':'#012456','Python':'#3572A5','Bicep':'#519ABA','C#':'#178600','TypeScript':'#3178C6','JavaScript':'#F1E05A','Shell':'#89E051','Go':'#00ADD8','Dockerfile':'#384D54','Jupyter Notebook':'#DA5B0B','HTML':'#E34C26'};
+
+  function el(tag,cls,text){var e=document.createElement(tag); if(cls){e.className=cls;} if(text!=null){e.textContent=text;} return e;}
+  function month(iso){try{return new Date(iso).toLocaleDateString('en-US',{month:'short',year:'numeric'});}catch(e){return '';}}
+
+  function render(repos){
+    var labs=repos.filter(function(r){
+      return !r.fork && !r.archived && Array.isArray(r.topics) && r.topics.indexOf(TOPIC)>-1 &&
+             typeof r.html_url==='string' && r.html_url.indexOf('https://github.com/')===0;
+    }).sort(function(a,b){return new Date(b.pushed_at)-new Date(a.pushed_at);});
+    if(!labs.length){return;}
+
+    box.textContent='';
+    labs.forEach(function(r){
+      var a=el('a','repo'); a.href=r.html_url; a.target='_blank'; a.rel='noopener';
+      a.appendChild(el('span','repo-name',r.name));
+      a.appendChild(el('p',null,r.description||'Write-up in progress.'));
+      var topics=r.topics.filter(function(t){return t!==TOPIC;}).slice(0,4);
+      if(topics.length){var tw=el('div','repo-topics'); topics.forEach(function(t){tw.appendChild(el('span','chip',t));}); a.appendChild(tw);}
+      var foot=el('div','repo-foot');
+      if(r.language){var l=el('span','lang'); var dot=el('i'); dot.style.background=LANG[r.language]||'var(--accent)'; l.appendChild(dot); l.appendChild(document.createTextNode(r.language)); foot.appendChild(l);}
+      foot.appendChild(el('span',null,'Updated '+month(r.pushed_at)));
+      if(r.stargazers_count>0){foot.appendChild(el('span',null,'★ '+r.stargazers_count));}
+      a.appendChild(foot);
+      box.appendChild(a);
+    });
+    box.hidden=false; empty.hidden=true;
+    if(meta){meta.textContent=labs.length+(labs.length===1?' published lab':' published labs')+' · updated '+month(labs[0].pushed_at);}
+  }
+
+  try{var c=JSON.parse(sessionStorage.getItem(KEY)||'null'); if(c&&Date.now()-c.t<TTL){render(c.d);return;}}catch(e){}
+  fetch('https://api.github.com/users/'+USER+'/repos?per_page=100&sort=pushed',{headers:{'Accept':'application/vnd.github+json'}})
+    .then(function(r){if(!r.ok){throw new Error(r.status);} return r.json();})
+    .then(function(d){
+      if(!Array.isArray(d)){return;}
+      var slim=d.map(function(r){return {name:r.name,description:r.description,html_url:r.html_url,topics:r.topics,language:r.language,pushed_at:r.pushed_at,stargazers_count:r.stargazers_count,fork:r.fork,archived:r.archived};});
+      try{sessionStorage.setItem(KEY,JSON.stringify({t:Date.now(),d:slim}));}catch(e){}
+      render(slim);
+    })
+    .catch(function(){ /* API unreachable or rate-limited: the static profile link and text remain */ });
 })();
 </script>
 </body>
