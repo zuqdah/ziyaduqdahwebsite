@@ -552,15 +552,15 @@ footer a:hover{color:var(--band-accent);}
     <div class="grid-2">
       <div class="lab">
         <span class="status">In build</span>
-        <h3>Hybrid identity: Active Directory to Entra ID</h3>
-        <p>An on-premises forest synchronized to a tenant, exercising the scenarios that actually cause trouble: sync error remediation, conditional access design, privileged access review, and a tenant-to-tenant consolidation of the kind that follows an acquisition.</p>
-        <div class="stack"><span class="chip">Active Directory</span><span class="chip">Entra ID</span><span class="chip">Conditional Access</span><span class="chip">Exchange</span></div>
+        <h3>Directory synchronization against a real forest</h3>
+        <p>The half of a hybrid identity cutover that a cloud tenant alone cannot show: an on-premises forest actually synchronized, with the sync errors that follow triaged against live data rather than against fixtures. The cloud side — conditional access, privileged access review, and pre-merge collision analysis — is already published above.</p>
+        <div class="stack"><span class="chip">Active Directory</span><span class="chip">Entra Connect</span><span class="chip">Exchange</span></div>
       </div>
       <div class="lab">
         <span class="status">In build</span>
-        <h3>Data platform modernization path</h3>
-        <p>A SQL Server estate carried through the modernization route end to end — compatibility assessment, performance baselines captured before and after, migration to a managed platform, and ingestion into a warehouse and analytics layer on top.</p>
-        <div class="stack"><span class="chip">SQL Server</span><span class="chip">Azure SQL</span><span class="chip">Snowflake</span><span class="chip">Databricks</span><span class="chip">Fabric</span></div>
+        <h3>Warehouse and analytics on a migrated estate</h3>
+        <p>What comes after the migration itself: ingestion from a managed SQL platform into a warehouse and an analytics layer, with the modelling and refresh choices that decide whether the reports on top stay trustworthy. The migration and rollback half is already published above.</p>
+        <div class="stack"><span class="chip">Snowflake</span><span class="chip">Databricks</span><span class="chip">Fabric</span><span class="chip">Power BI</span></div>
       </div>
       <div class="lab">
         <span class="status">In build</span>
