@@ -1,1 +1,10 @@
 _theme-preview.html
+
+# Never commit a key. The proxy reads it from an environment variable or from a
+# file above the document root, so nothing here should ever hold one -- these
+# patterns exist so a mistake fails at `git add` rather than in public.
+*.key
+*.pem
+.env
+.env.*
+private/

@@ -220,6 +220,28 @@ footer{background:var(--band);color:var(--band-muted);padding:var(--s4) 0 var(--
 footer .frow{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s3);align-items:center;justify-content:space-between;font-size:.82rem;}
 footer a{color:var(--band-muted);}
 footer a:hover{color:var(--band-accent);}
+/* ---------- ask the assistant ---------- */
+.ask{margin-top:2.5rem;border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);padding:1.5rem;box-shadow:var(--shadow-1);}
+.ask-head h3{margin:0 0 .4rem;font-size:1.1rem;}
+.ask-head p{margin:0 0 1.1rem;color:var(--ink-2);max-width:var(--prose);font-size:.93rem;}
+.ask-log{display:flex;flex-direction:column;gap:.7rem;}
+.ask-log:empty{display:none;}
+.ask-log .msg{padding:.7rem .9rem;border-radius:var(--r-sm);font-size:.93rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;}
+.ask-log .from-you{background:var(--surface-2);color:var(--ink);align-self:flex-end;max-width:85%;}
+.ask-log .from-bot{background:var(--accent-wash);color:var(--ink);border:1px solid var(--rule);}
+.ask-log .is-problem{background:transparent;border:1px dashed var(--rule-2);color:var(--ink-2);}
+.ask-suggest{display:flex;flex-wrap:wrap;gap:.45rem;margin:1rem 0 .9rem;}
+.ask-suggest[hidden]{display:none;}  /* an explicit display overrides the hidden attribute, so it needs saying */
+.chip-btn{font:inherit;font-size:.8rem;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--rule);
+  border-radius:999px;padding:.35rem .7rem;cursor:pointer;}
+.chip-btn:hover{color:var(--ink);border-color:var(--rule-2);}
+.ask-form{display:flex;gap:.6rem;flex-wrap:wrap;}
+.ask-form input{flex:1 1 16rem;min-width:0;font:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);
+  border:1px solid var(--rule-2);border-radius:var(--r-sm);padding:.6rem .8rem;}
+.ask-form input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.ask-form button[disabled]{opacity:.55;cursor:default;}
+.ask-note{margin:.9rem 0 0;font-size:.8rem;color:var(--ink-3);}
+@media (max-width:560px){ .ask{padding:1.1rem;} .ask-log .from-you{max-width:100%;} }
 </style>
 </head>
 <body>
@@ -232,6 +254,7 @@ footer a:hover{color:var(--band-accent);}
       <a class="navlink" href="#focus">Focus</a>
       <a class="navlink" href="#impact">Impact</a>
       <a class="navlink" href="#experience">Experience</a>
+      <a class="navlink" href="#scenarios">Scenarios</a>
       <a class="navlink" href="#labs">Labs</a>
       <a class="navlink" href="#skills">Skills</a>
       <button class="iconbtn" id="themebtn" type="button" aria-label="Toggle light and dark theme" title="Toggle theme">
@@ -525,6 +548,87 @@ footer a:hover{color:var(--band-accent);}
   </div>
 </section>
 
+<!-- ============ SCENARIOS ============ -->
+<section id="scenarios">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">What this looks like in practice</p>
+      <h2>Six things you might need, and what I would actually do</h2>
+      <p>Every scenario below links to working code that proves the claim — infrastructure-as-code, tests, and a written account of what the build got wrong before it got it right. Ask the assistant at the bottom of this section if you want to dig into any of them.</p>
+    </div>
+
+    <div class="grid-2">
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;We need to migrate this database, and we need to be able to go back.&rdquo;</h3>
+        <p>A pre-flight assessment that blocks the migration if the schema will not survive it, then parity proven by content checksum rather than row count — because two tables with the same number of rows can still differ. The rollback is restored and verified in a drill, not documented and hoped for.</p>
+        <div class="stack"><span class="chip">SQL Server</span><span class="chip">Azure SQL</span><span class="chip">Terraform</span><span class="chip">Pester</span></div>
+      </div>
+
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;Our DR plan says four hours. Is that true?&rdquo;</h3>
+        <p>Almost certainly not, because the clock usually starts when somebody runs the failover command — which excludes detection and decision, the part of an outage that is actually longest. I fail the estate over for real and time it from the first failed write, then count data loss by comparing what the old primary acknowledged against what survived.</p>
+        <div class="stack"><span class="chip">Azure SQL</span><span class="chip">Failover groups</span><span class="chip">RTO/RPO</span><span class="chip">Runbooks</span></div>
+      </div>
+
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;We are about to turn on Conditional Access and we are nervous.&rdquo;</h3>
+        <p>Rightly so — it is the one control that can lock you out of the thing you would use to undo it. Policies deploy report-only and get evaluated against a declared matrix of sign-ins before anything is enforced, including a check that the break-glass accounts can still reach a recovery surface. Promotion is something the evaluation has to earn.</p>
+        <div class="stack"><span class="chip">Entra ID</span><span class="chip">Conditional Access</span><span class="chip">Graph API</span><span class="chip">Terraform</span></div>
+      </div>
+
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;We acquired a company and now we have two directories.&rdquo;</h3>
+        <p>The work that decides whether the cutover goes well happens weeks earlier, in the objects: namespaces that cannot be verified, two people holding the same address in different letter case, a disabled leaver holding the sign-in name a new starter needs. I assess that against the live directory, and I check the filter change that silently <em>deletes</em> accounts in the cloud rather than disabling them.</p>
+        <div class="stack"><span class="chip">Active Directory</span><span class="chip">Entra ID</span><span class="chip">PowerShell</span><span class="chip">Migration</span></div>
+      </div>
+
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;Show us that our access model is actually least privilege.&rdquo;</h3>
+        <p>Not by reading role assignments — by signing in as each identity and attempting what it is supposed to be refused. The analysis is written to avoid the false positives that make these reports unreadable: an account excluded from a policy by group membership is not a finding, and neither is the break-glass account that is meant to hold standing privilege.</p>
+        <div class="stack"><span class="chip">Azure RBAC</span><span class="chip">ABAC conditions</span><span class="chip">OIDC</span><span class="chip">Drift detection</span></div>
+      </div>
+
+      <div class="lab">
+        <span class="status">Proven</span>
+        <h3>&ldquo;Our integration loses messages and we cannot reproduce it.&rdquo;</h3>
+        <p>Then it needs to be tested against the failures that actually happen: the same message delivered twice, a poison message that must not block the queue behind it, two consumers racing for the same work, and a replay path that repairs what it understands and refuses what it does not. At-least-once delivery is a contract, and most code assumes exactly-once.</p>
+        <div class="stack"><span class="chip">Service Bus</span><span class="chip">Idempotency</span><span class="chip">Dead-letter</span><span class="chip">Python</span></div>
+      </div>
+    </div>
+
+    <div class="ask" id="ask">
+      <div class="ask-head">
+        <h3>Ask about any of this</h3>
+        <p>An assistant grounded in the resume and the eleven lab write-ups on this page &mdash; and nothing else. It will tell you when something is outside what it knows rather than guessing, which for a question about somebody&rsquo;s career is the only useful behaviour. Running on an open-weight model.</p>
+      </div>
+
+      <div class="ask-log" id="ask-log" role="log" aria-live="polite" aria-label="Conversation"></div>
+
+      <div class="ask-suggest" id="ask-suggest">
+        <button type="button" class="chip-btn">How much Azure SQL experience does he have?</button>
+        <button type="button" class="chip-btn">What has he done with Terraform?</button>
+        <button type="button" class="chip-btn">Has he run a real datacenter migration?</button>
+        <button type="button" class="chip-btn">Which lab should I look at first?</button>
+      </div>
+
+      <form class="ask-form" id="ask-form" autocomplete="off">
+        <label class="skip" for="ask-input">Your question</label>
+        <input type="text" id="ask-input" name="q" maxlength="600"
+               placeholder="Ask about the experience, the labs, or a specific technology&hellip;">
+        <button type="submit" class="btn btn-primary" id="ask-send">Ask</button>
+      </form>
+
+      <p class="ask-note" id="ask-note">Answers come from a fixed brief, so treat anything surprising as worth
+        confirming at <a href="mailto:ziyad@ziyaduqdah.com">ziyad@ziyaduqdah.com</a>.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ============ LABS ============ -->
 <section id="labs">
   <div class="wrap">
@@ -747,6 +851,80 @@ footer a:hover{color:var(--band-accent);}
       render(slim);
     })
     .catch(function(){ /* API unreachable or rate-limited: the static profile link and text remain */ });
+})();
+</script>
+
+<script>
+/* Site assistant. Talks to chat.php, which holds the key server-side.
+   Everything here degrades to the scenarios above: if the endpoint is missing,
+   unconfigured or rate limited, the page is still complete without it. */
+(function () {
+  var form = document.getElementById('ask-form');
+  if (!form) return;
+
+  var input   = document.getElementById('ask-input');
+  var send    = document.getElementById('ask-send');
+  var log     = document.getElementById('ask-log');
+  var suggest = document.getElementById('ask-suggest');
+  var history = [];
+  var busy    = false;
+
+  function add(text, kind) {
+    var el = document.createElement('div');
+    el.className = 'msg ' + kind;
+    el.textContent = text;           // textContent, never innerHTML: model output is not markup
+    log.appendChild(el);
+    el.scrollIntoView({ block: 'nearest' });
+    return el;
+  }
+
+  function ask(question) {
+    if (busy || !question) return;
+    busy = true;
+    send.disabled = true;
+    if (suggest) suggest.hidden = true;
+
+    add(question, 'from-you');
+    var pending = add('Thinking…', 'from-bot');
+
+    fetch('chat.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: question, history: history.slice(-8) })
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.reply) {
+          pending.textContent = (res.body && res.body.error)
+            ? res.body.error
+            : 'The assistant is unavailable. The scenarios above cover the same ground.';
+          pending.className = 'msg is-problem';
+          return;
+        }
+        pending.textContent = res.body.reply;
+        history.push({ role: 'user', content: question });
+        history.push({ role: 'assistant', content: res.body.reply });
+      })
+      .catch(function () {
+        pending.textContent = 'The assistant could not be reached. The scenarios above cover the same ground, or email ziyad@ziyaduqdah.com.';
+        pending.className = 'msg is-problem';
+      })
+      .then(function () { busy = false; send.disabled = false; input.focus(); });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var q = input.value.trim();
+    input.value = '';
+    ask(q);
+  });
+
+  if (suggest) {
+    suggest.addEventListener('click', function (e) {
+      var btn = e.target.closest('.chip-btn');
+      if (btn) ask(btn.textContent.trim());
+    });
+  }
 })();
 </script>
 </body>
