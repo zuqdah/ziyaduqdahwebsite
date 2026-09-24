@@ -28,9 +28,13 @@ then a file inside it called `groq.key` containing the key and nothing else.
     └── capability-brief.md
 ```
 
-Above the document root is the point: nothing serves that folder over HTTP and
-nothing in the git repository can reach it, so the key cannot be requested by a
-visitor and cannot be committed by accident. `.gitignore` also blocks `*.key`
+Above the document root is the point, and `chat.php` enforces it: a key found
+inside `httpdocs` is **refused**, not used. During setup the key was placed in
+`httpdocs/private/` and was not downloadable -- but only because the server
+happened to answer 403 for that path, which is a config nobody chose for this
+purpose and which a vhost template change would quietly remove. Reading it
+anyway would mean the assistant worked perfectly while one server tweak stood
+between the key and the public, and nothing would ever say so. `.gitignore` also blocks `*.key`
 and `private/` so a mistake fails at `git add` rather than in public.
 
 If you would rather use an environment variable, set `GROQ_API_KEY` in Plesk's

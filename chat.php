@@ -58,13 +58,34 @@ function apiKey(): string
         return trim($fromEnv);
     }
 
+    $docRoot = (string) ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__);
+
     // One level above the document root: served by nothing, cloned by nothing.
-    $path = dirname($_SERVER['DOCUMENT_ROOT'] ?? __DIR__) . '/private/groq.key';
+    $path = dirname($docRoot) . '/private/groq.key';
     if (is_readable($path)) {
         $key = trim((string) file_get_contents($path));
         if ($key !== '') {
             return $key;
         }
+    }
+
+    // A key inside the web root is refused rather than used.
+    //
+    // During setup the key was placed in httpdocs/private/. It was not
+    // downloadable, but only because the server happened to answer 403 for
+    // that path -- incidental protection from a config nobody chose for this
+    // purpose and which a vhost template change would quietly remove. Reading
+    // it anyway would mean the assistant works perfectly while one server
+    // tweak stands between the key and the public, and nothing would ever
+    // report that. Refusing makes the insecure arrangement visible instead of
+    // comfortable.
+    $inWebRoot = $docRoot . '/private/groq.key';
+    if (@is_readable($inWebRoot)) {
+        fail(
+            503,
+            'The assistant is not configured correctly.',
+            'key found INSIDE the web root at ' . $inWebRoot . ' and was refused. Move it to ' . $path
+        );
     }
 
     fail(503, 'The assistant is not configured yet.', 'no API key in GROQ_API_KEY or ' . $path);
