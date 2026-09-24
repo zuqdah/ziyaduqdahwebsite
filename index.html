@@ -869,10 +869,32 @@ footer a:hover{color:var(--band-accent);}
   var history = [];
   var busy    = false;
 
+  // The model emits markdown even when the brief tells it not to, and replies
+  // are inserted with textContent -- never innerHTML, because model output is
+  // not markup -- so the markers arrive on the page as literal asterisks. A
+  // visitor was seeing **disaster-recovery-actually-failed-over**, backticks
+  // and all.
+  //
+  // Strip the markers rather than render them. Rendering means handing model
+  // output a path to innerHTML, and bold text is not worth that trade on a page
+  // whose whole point is being trustworthy. This is deliberately narrow: only
+  // the constructs that look broken as plain text. Single * and _ are left
+  // alone, because stripping them risks mangling ordinary prose for a case the
+  // model almost never produces, and "- " bullets already read fine.
+  function plain(text) {
+    return String(text)
+      .replace(/(\*\*|__)\s*([\s\S]*?)\s*\1/g, '$2')  // **bold**, __bold__
+      .replace(/^[ \t]*`{3,}[a-z]*[ \t]*$\n?/gim, '') // ``` fence lines, whole line
+      .replace(/`+([^`\n]+)`+/g, '$1')                // `code`
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')             // # headings
+      .replace(/[ \t]{2,}/g, ' ')                     // padding the above leaves behind
+      .trim();
+  }
+
   function add(text, kind) {
     var el = document.createElement('div');
     el.className = 'msg ' + kind;
-    el.textContent = text;           // textContent, never innerHTML: model output is not markup
+    el.textContent = plain(text);    // textContent, never innerHTML: model output is not markup
     log.appendChild(el);
     el.scrollIntoView({ block: 'nearest' });
     return el;
@@ -901,7 +923,10 @@ footer a:hover{color:var(--band-accent);}
           pending.className = 'msg is-problem';
           return;
         }
-        pending.textContent = res.body.reply;
+        pending.textContent = plain(res.body.reply);
+        // History keeps the model's own wording, markers and all. That is what
+        // it actually said, and stripping formatting from its own context would
+        // quietly edit the conversation it is reasoning over.
         history.push({ role: 'user', content: question });
         history.push({ role: 'assistant', content: res.body.reply });
       })

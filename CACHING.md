@@ -101,7 +101,22 @@ location ~* \.md$               { deny all; }
 location ~* \.(key|pem|env)$ {
     deny all;
 }
+
+# Support material that is not part of the site. "^~" beats every regex
+# location, same principle as the exact matches above.
+#
+# The repository root IS the web root here -- Plesk deploys straight into
+# httpdocs -- so every file committed becomes a URL, which is how CACHING.md
+# became a public page. One rule for a directory is the durable version of that
+# fix; denying each new file by name is not.
+location ^~ /dev/ {
+    deny all;
+}
 ```
+
+The page itself needs exactly three local files — `index.html`, `chat.php` and
+`Ziyad_Uqdah_Resume.pdf` — plus the GitHub API, which is external. Everything
+else in the repository is support material and belongs in `dev/`.
 
 ## Why `no-cache` and not a short `max-age`
 
