@@ -43,6 +43,29 @@ PHP settings instead — `chat.php` checks that first.
 **3. Tell me when it is there** and I will test it, including trying to make it
 invent things.
 
+## Editing the grounding file
+
+`capability-brief.md` is the **only** source the assistant may answer from. It
+is read by `chat.php` at request time and sent as the system context.
+
+Every fact in it is transcribed from `index.html` and from the public lab
+repositories, both of which derive from Ziyad's resume. **Do not add to it from
+memory.** If a fact is not in there, the assistant is required to say it does
+not know — a career assistant that invents an employer, a date or a
+certification is worse than no assistant.
+
+**Write it addressed to the model, and put developer notes here instead.** It
+used to open with fifteen lines of notes about this file, `chat.php` and the
+token budget. The model received every word of that as its system context, and
+it showed: asked which lab to read first, the assistant replied "the brief does
+not specify a recommended order for the labs" — plumbing a visitor should never
+see, in vocabulary the file itself had handed it. Those notes also cost around
+150 tokens on every single request.
+
+Keep it under roughly 1,800 tokens. The free tier allows 200,000 tokens a day
+and the whole file is resent on every call, so its length is the main thing
+deciding how many conversations the site can serve.
+
 ## What it costs
 
 Nothing, within the free tier: **1,000 requests and 200,000 tokens a day**.
