@@ -74,13 +74,26 @@ location = /index.html {
     add_header Cache-Control "no-cache, must-revalidate" always;
 }
 
-location = /capability-brief.md {
-    add_header Cache-Control "no-cache, must-revalidate" always;
-}
-
 location = /Ziyad_Uqdah_Resume.pdf {
     add_header Cache-Control "no-cache, must-revalidate" always;
 }
+
+# Markdown in the web root is documentation and the assistant's grounding
+# brief. Nothing on the page links to any of it and nothing needs to be served:
+# chat.php reads capability-brief.md off the local filesystem via __DIR__, not
+# over HTTP, so denying it changes nothing about how the assistant works.
+#
+# Serving them leaked the API key's server path, the exact rate-limit values and
+# these notes to anyone who guessed a filename. This file caused that: it was
+# created inside the web root without considering that the web root is served.
+#
+# The exact matches are guaranteed to beat any regex location Plesk generates.
+# The regex is a catch-all for markdown added later, which works unless ordering
+# defeats it -- in which case the exact matches still cover what exists.
+location = /capability-brief.md { deny all; }
+location = /README-chat.md      { deny all; }
+location = /CACHING.md          { deny all; }
+location ~* \.md$               { deny all; }
 
 # Backstop only. The key belongs above the document root and chat.php refuses to
 # read one from inside it. This covers the case where a key file lands in
@@ -139,3 +152,36 @@ it is added to the block above. That is the trade taken for immunity to location
 ordering. If the site grows past a handful of files, replace the exact matches
 with a single regex location and verify the ordering against Plesk's generated
 config rather than assuming it.
+
+## Verifying the denies
+
+```bash
+for p in /capability-brief.md /README-chat.md /CACHING.md /anything-new.md \
+         /test.key /x.env; do
+  printf "%-24s " "$p"
+  curl -sS -o /dev/null -w "%{http_code}\n" "https://ziyaduqdah.com$p"
+done
+```
+
+All six should be `403`. `/anything-new.md` does not exist and is there to prove
+the catch-all regex is reached rather than the response merely being a 404 in
+disguise.
+
+Then confirm the assistant still answers, since the brief it depends on is now
+denied over HTTP:
+
+```bash
+curl -sS -X POST https://ziyaduqdah.com/chat.php \
+  -H "Content-Type: application/json" \
+  --data '{"message":"Which lab measured recovery time, and how?"}'
+```
+
+A grounded answer naming `disaster-recovery-actually-failed-over` means the
+filesystem read is unaffected, which is the whole basis for denying it.
+
+## A note on where this policy lives
+
+These directives are in **Plesk, not this repository**, so they do not travel
+with a git deploy. If the site is migrated or the vhost is rebuilt, the block
+has to be pasted back and nothing will warn anyone: the symptom is the stale-page
+problem quietly returning and the markdown files quietly becoming public again.
