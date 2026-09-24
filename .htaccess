@@ -1,0 +1,20 @@
+# Apache-side rules only.
+#
+# Cache policy is NOT here, deliberately. This server is Plesk running nginx in
+# front of Apache with static-file processing on: nginx serves .html, .md and
+# .pdf itself and never asks Apache, which is provable from the ETag formats --
+# nginx writes "<hex-mtime>-<hex-size>" and Apache writes "<hex-size>-<hex-mtime>",
+# and the homepage carries the nginx one. A Cache-Control directive in this file
+# would therefore have no effect on the page that needs it while looking exactly
+# like a fix. Cache policy lives in the nginx directives; see CACHING.md.
+#
+# What reaches Apache is PHP, and chat.php already sets its own no-store header.
+
+# The key never belongs under the web root and chat.php refuses to read one from
+# here. This is a backstop for the case where a key file is placed in httpdocs by
+# mistake AND the request is handled by Apache rather than nginx. The matching
+# nginx rule covers the other case; which layer answers for an unusual extension
+# is not something worth guessing at, so both are set.
+<FilesMatch "\.(key|pem|env)$">
+  Require all denied
+</FilesMatch>
