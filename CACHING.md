@@ -53,13 +53,22 @@ directives**, then Apply.
 # wrong. The cost is that filenames are hardcoded, which is fine for a site of
 # three static files and is noted in CACHING.md so it gets revisited.
 #
-# A request for "/" is resolved to /index.html by the index directive, which
-# issues an internal redirect and re-runs location matching. So the exact match
-# below does cover the bare homepage, which is the only request that matters.
+# The bare "/" needs its own block and does NOT come along for free. The first
+# version of this assumed nginx resolves "/" to /index.html via the index
+# directive and re-runs location matching, landing in "location = /index.html".
+# It does not. That is measured rather than reasoned: with the exact matches
+# applied, /index.html carried the header and "/" did not. So "/" gets its own
+# location, and uses try_files rather than index so that index.html is served
+# INSIDE that location and the header is guaranteed to apply.
 #
 # "always" is load-bearing. Without it nginx omits add_header on 304 responses,
 # and 304 is exactly what revalidation produces -- the header would appear on
 # the first request and vanish on every one after it.
+
+location = / {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    try_files /index.html =404;
+}
 
 location = /index.html {
     add_header Cache-Control "no-cache, must-revalidate" always;
@@ -101,6 +110,11 @@ revalidation costs nothing worth having.
 
 The check must be a plain request with default caching. A cache-buster proves
 nothing, because it is not the request a visitor makes.
+
+**Check `/` and `/index.html` separately.** They are different requests to
+nginx and the first round of this got one right and the other wrong. `/` is the
+one a visitor actually sends; `/index.html` passing is not evidence that it
+does.
 
 ```bash
 curl -sSI https://ziyaduqdah.com/ | grep -i cache-control
