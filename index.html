@@ -970,11 +970,45 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   // alone, because stripping them risks mangling ordinary prose for a case the
   // model almost never produces, and "- " bullets already read fine.
   function plain(text) {
+    // Unicode the model substitutes for ASCII, undone before the reply is shown.
+    //
+    // Measured over a full eval run: 26 non-breaking hyphens (U+2011) and 11
+    // narrow no-break spaces (U+202F) across seventeen replies. The hyphen is
+    // the one that matters. The model writes repository names with U+2011
+    // between the words, which looks correct on screen and finds nothing at all
+    // when a reader pastes it into GitHub search -- a dead end that reads as the
+    // lab not existing.
+    //
+    // Built from character codes, not written as escape sequences, because an
+    // escape written into this file has twice been converted to the character it
+    // denotes -- leaving a character class made of invisible characters that
+    // nobody can review. Numbers survive editing.
+    //
+    // Declared inside the function on purpose: dev/test-plain.mjs extracts this
+    // function alone out of index.html, so anything it depends on from an outer
+    // scope would be undefined under test and the test would be exercising
+    // something the page does not run.
+    var dashes = String.fromCharCode(0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212);
+    var spaces = String.fromCharCode(
+      0x00a0, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+      0x2007, 0x2008, 0x2009, 0x200a, 0x202f, 0x205f, 0x3000
+    );
+    var zeroWidth = String.fromCharCode(0x200b, 0x200c, 0x200d, 0x2060, 0xfeff);
+
+    // Only between two alphanumerics, so a spaced en dash used as punctuation is
+    // left alone and only word-joining dashes are touched. The trailing
+    // character is a lookahead rather than part of the match, so it can still
+    // start the next match and a-b-c is fixed in a single pass.
+    var joiningDash = new RegExp('([A-Za-z0-9])[' + dashes + '](?=[A-Za-z0-9])', 'g');
+
     return String(text)
       .replace(/(\*\*|__)\s*([\s\S]*?)\s*\1/g, '$2')  // **bold**, __bold__
       .replace(/^[ \t]*`{3,}[a-z]*[ \t]*$\n?/gim, '') // ``` fence lines, whole line
       .replace(/`+([^`\n]+)`+/g, '$1')                // `code`
       .replace(/^\s{0,3}#{1,6}\s+/gm, '')             // # headings
+      .replace(new RegExp('[' + zeroWidth + ']', 'g'), '')       // invisible, breaks copy-paste
+      .replace(new RegExp('[' + spaces + ']', 'g'), ' ')         // narrow and no-break spaces
+      .replace(joiningDash, '$1-')                    // names a reader can paste
       .replace(/[ \t]{2,}/g, ' ')                     // padding the above leaves behind
       .trim();
   }

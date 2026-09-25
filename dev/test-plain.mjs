@@ -11,8 +11,31 @@ const cases = [
    'The lab that measured recovery time is disaster-recovery-actually-failed-over. In this lab'],
   ['The **disaster-recovery-actually-failed-over** lab measured recovery time.',
    'The disaster-recovery-actually-failed-over lab measured recovery time.'],
-  ['calculated the recovery\u2011time\u2011objective (RTO) starting',
-   'calculated the recovery\u2011time\u2011objective (RTO) starting'],
+  // Non-breaking hyphens are now converted, and this case used to assert the
+  // opposite. The earlier expectation was that exotic punctuation should be left
+  // alone as the model's typography; the evidence that overturned it is a full
+  // eval run, where 26 of these appeared and the repository names carrying them
+  // were unpasteable. A name a reader cannot paste into a search is not
+  // typography, it is a dead end that reads as the lab not existing.
+  ['calculated the recovery‑time‑objective (RTO) starting',
+   'calculated the recovery-time-objective (RTO) starting'],
+  // The reply that exposed it, verbatim from dev/eval-report.json.
+  ['He measures it in the the‑second‑run‑changed‑nothing lab.',
+   'He measures it in the the-second-run-changed-nothing lab.'],
+  // Every joining dash in one name, so a single-pass bug that fixed only the
+  // first or only alternate hyphens would fail here.
+  ['See entra‑cutover‑without‑lockout for that.',
+   'See entra-cutover-without-lockout for that.'],
+  // A spaced en dash is punctuation, not a joiner, and must survive.
+  ['copilot-studio-alm – treats an agent as source.',
+   'copilot-studio-alm – treats an agent as source.'],
+  // A narrow no-break space, which is what made a correct answer fail the eval.
+  ['He works at US Cloud today.', 'He works at US Cloud today.'],
+  // Zero-width characters are removed outright rather than turned into spaces.
+  ['the​import​said​success', 'theimportsaidsuccess'],
+  // A minus sign between digits is a joining dash by the rule above. Converting
+  // it is correct here: this is prose about a range, not arithmetic.
+  ['2019–2021 at Accruent', '2019-2021 at Accruent'],
   ['__bold__ and `code` here', 'bold and code here'],
   ['# Heading\nbody', 'Heading\nbody'],
   ['### Deep\nbody', 'Deep\nbody'],

@@ -74,10 +74,38 @@ const rx = (pattern) => new RegExp(pattern, 'i');
  * brief states plainly, this would have read as the model failing to name the
  * employer rather than the grader failing to see it.
  */
+/**
+ * Character classes built from numeric code points.
+ *
+ * Not a style choice. Most of these characters are invisible or look exactly
+ * like the ASCII character they are not, so written literally they produce a
+ * character class nobody can review -- and two earlier drafts of this file had
+ * precisely that, because escape sequences written into the source were
+ * helpfully converted to the characters they denote. Numbers survive editing.
+ */
+const charClass = (...ranges) =>
+  new RegExp(
+    '[' +
+      ranges
+        .map(([from, to = from]) => {
+          let out = '';
+          for (let cp = from; cp <= to; cp++) out += String.fromCodePoint(cp);
+          return out;
+        })
+        .join('') +
+      ']',
+    'g',
+  );
+
+const ZERO_WIDTH = charClass([0x200b, 0x200d], [0x2060], [0xfeff]);
+const SPACE_LIKE = charClass([0x00a0], [0x1680], [0x2000, 0x200a], [0x202f], [0x205f], [0x3000]);
+const HYPHEN_LIKE = charClass([0x2010, 0x2015], [0x2212]);
+
 function normalise(text) {
   return text
-    .replace(/[​‌‍⁠﻿]/g, '')          // zero width: remove
-    .replace(/[   -   　]/g, ' '); // space-like: make it a space
+    .replace(ZERO_WIDTH, '')
+    .replace(SPACE_LIKE, ' ')
+    .replace(HYPHEN_LIKE, '-');
 }
 
 // Every repository name the brief is allowed to route to. Used by the
@@ -95,6 +123,30 @@ const LAB_NAMES = [
 const EMAIL = 'ziyad@ziyaduqdah.com';
 
 /**
+ * Catches a repository name written with a hyphen that is not a hyphen.
+ *
+ * Measured over the first full run: 26 occurrences of U+2011, the non-breaking
+ * hyphen, across seventeen replies. The model reaches for it in the place it
+ * does the most damage -- inside repository names -- where it looks correct on
+ * screen and finds nothing at all when pasted into a search.
+ *
+ * Deliberately separate from the normaliser. Normalising lets the routing checks
+ * see that the model routed correctly, which in every case it did; this reports
+ * the other half, that the name it gave is not the name. A reply can be both
+ * correctly routed and unusable, and one verdict covering both loses the half
+ * worth acting on.
+ */
+const ANY_HYPHEN = '[' + [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212]
+  .map((cp) => String.fromCodePoint(cp)).join('') + '-]';
+
+function unpasteableNames(rawReply) {
+  return LAB_NAMES.filter((name) => {
+    const loose = new RegExp(name.replaceAll('-', ANY_HYPHEN), 'i');
+    return loose.test(rawReply) && !new RegExp(name, 'i').test(rawReply);
+  });
+}
+
+/**
  * Grades one reply. Returns the failures, which is the empty list for a pass.
  *
  * Note what is NOT here: any judgement about whether the answer was good. This
@@ -106,9 +158,26 @@ function grade(testCase, rawReply, finishReason) {
   const reply = normalise(rawReply);
 
   for (const rule of spec.globals.forbidden) {
-    if (rx(rule.pattern).test(reply)) {
-      failures.push(`global ${rule.id}: ${rule.why}`);
+    const hit = reply.match(rx(rule.pattern));
+    if (!hit) continue;
+
+    // Some rules are about the model ASSERTING something, not about the word
+    // appearing. The first run failed a reply that said "the site does not list
+    // any data-loss objectives" for containing "data-loss objective" -- it was
+    // repeating the questioner's invented term in order to reject it, which is
+    // the behaviour the brief asks for. A rule that cannot tell those apart
+    // punishes the right answer.
+    if (rule.unlessNegated) {
+      const before = reply.slice(Math.max(0, hit.index - 80), hit.index);
+      const NEGATED = new RegExp("(^|[^a-z])(?:not|no|none|nothing|isn.?t|aren.?t|does ?n.t|do ?n.t)(?![a-z])", "i");
+      if (NEGATED.test(before)) continue;
     }
+
+    failures.push(`global ${rule.id}: ${rule.why}`);
+  }
+
+  for (const name of unpasteableNames(rawReply)) {
+    failures.push(`wrote "${name}" with a non-ASCII hyphen, so it cannot be pasted into a search and never appears in plain form`);
   }
 
   const words = reply.split(/\s+/).filter(Boolean).length;
@@ -168,11 +237,11 @@ function selfTest() {
   const ok = { id: 'x', question: 'q' };
 
   // Built from code points rather than written as escapes in a string literal.
-  // The first attempt at these cases wrote   into the source and it arrived
-  // as a plain space, so all three passed without the normaliser doing anything
-  // -- three green lines proving nothing, in the fix for a grader that had
-  // already graded a correct answer wrong. The assertion below makes that
-  // failure mode impossible to repeat quietly.
+  // The first attempt at these cases wrote the escape sequence for U+202F into
+  // the source and it arrived as a plain space, so all three passed without the
+  // normaliser doing anything -- three green lines proving nothing, in the fix
+  // for a grader that had already graded a correct answer wrong. The assertion
+  // below makes that failure mode impossible to repeat quietly.
   const NNBSP = String.fromCodePoint(0x202f);  // narrow no-break space
   const NBSP = String.fromCodePoint(0x00a0);   // no-break space
   const ZWSP = String.fromCodePoint(0x200b);   // zero-width space
@@ -206,6 +275,25 @@ function selfTest() {
       { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${NBSP}Cloud.`, 'stop', false],
     ['a zero-width space does not hide a match',
       { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${ZWSP} Cloud.`, 'stop', false],
+
+    // The U+2011 finding from the first full run, both directions.
+    ['a repository name with a non-ASCII hyphen is caught',
+      { ...ok, mustIncludeAny: ['the-second-run-changed-nothing'] },
+      `He measures it in the ${'the-second-run-changed-nothing'.replaceAll('-', String.fromCodePoint(0x2011))} lab.`,
+      'stop', true],
+    ['the same name with real hyphens passes',
+      { ...ok, mustIncludeAny: ['the-second-run-changed-nothing'] },
+      'He measures it in the the-second-run-changed-nothing lab.', 'stop', false],
+    ['a mangled name alongside the plain one passes',
+      { ...ok, mustIncludeAny: ['entra-cutover-without-lockout'] },
+      `See ${'entra-cutover-without-lockout'.replaceAll('-', String.fromCodePoint(0x2011))}; the repository is entra-cutover-without-lockout.`,
+      'stop', false],
+
+    // The narrowed acronym rule, both directions.
+    ['coining a term is still caught',
+      ok, 'His data-loss objective was four hours.', 'stop', true],
+    ["rejecting the questioner's invented term is not",
+      ok, 'The site does not list any data-loss objectives. Email him.', 'stop', false],
 
     ['a missing required string is caught',
       { ...ok, mustIncludeAll: ['US Cloud'] }, 'He works somewhere in Louisiana.', 'stop', true],
@@ -456,6 +544,47 @@ if (flag('self-test')) {
   console.log('Grader self-test -- no network, no tokens.\n');
   selfTest();
   process.exit(0);
+}
+
+/*
+ * Re-grade the replies from the last run, offline.
+ *
+ * The graders changed twice after the first full run -- once for narrow no-break
+ * spaces, once for non-breaking hyphens -- and both were grader bugs rather than
+ * model behaviour. Re-asking the model would have cost another 41,000 tokens to
+ * learn nothing about it, so the recorded replies are scored again instead. The
+ * verdicts move; the replies do not.
+ *
+ * It runs the self-test first, like every other mode, and it writes the report
+ * back so the file on disk always matches the graders that produced it.
+ */
+if (flag('regrade')) {
+  console.log('Grader self-test first.');
+  console.log('');
+  selfTest();
+
+  const previous = JSON.parse(readFileSync(REPORT, 'utf8'));
+  console.log('');
+  console.log(`Re-grading ${previous.results.length} recorded replies from ${previous.generatedUtc}.`);
+  console.log('');
+
+  let changed = 0;
+  const results = previous.results.map((r) => {
+    if (typeof r.reply !== 'string') return r;
+    const testCase = spec.cases.find((c) => c.id === r.id);
+    const failures = grade(testCase, r.reply, r.finishReason);
+    const outcome = failures.length ? 'Fail' : 'Pass';
+    if (outcome !== r.outcome) changed++;
+    const moved = outcome === r.outcome ? ' ' : '*';
+    console.log(`  ${moved} ${r.id.padEnd(32)} ${r.outcome} -> ${outcome}`);
+    for (const f of failures) console.log(`        ${f}`);
+    return { ...r, outcome, failures };
+  });
+
+  console.log('');
+  console.log(`  ${changed} verdict(s) changed on identical replies.`);
+  const ok = report({ results, tokens: previous.tokens ?? 0, unmeasured: previous.unmeasuredCalls ?? 0 });
+  process.exit(ok ? 0 : 1);
 }
 
 if (flag('plan') || !flag('run')) {
