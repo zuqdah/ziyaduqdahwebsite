@@ -108,6 +108,89 @@ function normalise(text) {
     .replace(HYPHEN_LIKE, '-');
 }
 
+/**
+ * The page's own plain(), pulled out of index.html.
+ *
+ * The eval grades what a reader sees, which is the reply after plain() has run
+ * over it -- not what chat.php returned. That distinction decides whether five
+ * of the first run's six failures are failures at all: the model emits markdown
+ * and non-breaking hyphens, and the page deterministically removes both, so no
+ * visitor ever encounters them. Reporting them as failures for ever would give
+ * this suite a permanent floor of known-bad results, and a suite with a
+ * permanent floor stops being read.
+ *
+ * The model's non-compliance is still worth knowing, so it is counted and
+ * reported separately as compliance rather than silently dropped. It does not
+ * fail the run, because the page already handles it.
+ *
+ * One consequence worth naming: the markdown rules now test plain(), not the
+ * model. If plain() ever stops stripping bold, they fire -- which is exactly
+ * when somebody needs to know.
+ *
+ * Extracted rather than reimplemented, for the reason dev/test-plain.mjs does
+ * the same: a second copy would let this file grade output the site does not
+ * produce.
+ */
+const pageSource = readFileSync(resolve(here, '..', 'index.html'), 'utf8');
+const plainMatch = pageSource.match(/function plain\(text\) \{[\s\S]*?\n  \}/);
+if (!plainMatch) {
+  console.error('Could not extract plain() from index.html. Refusing to grade: without it this');
+  console.error('would score raw model output as though a reader saw it, which is a different');
+  console.error('and more forgiving question than the one this file exists to ask.');
+  process.exit(2);
+}
+const renderAsPage = new Function('return (' + plainMatch[0].replace(/^function plain/, 'function') + ')')();
+
+// A dash that touches an alphanumeric is a copy-paste hazard: a repository name
+// that finds nothing, or a -WhatIf that will not parse. A spaced em dash is
+// punctuation and is left alone, so it must not be reported here.
+const DASH_CHARS = [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212].map((cp) =>
+  String.fromCodePoint(cp),
+);
+
+function pasteHazards(rendered) {
+  const hazards = [];
+  for (let i = 0; i < rendered.length; i++) {
+    if (!DASH_CHARS.includes(rendered[i])) continue;
+    const before = rendered[i - 1] ?? '';
+    const after = rendered[i + 1] ?? '';
+    if (/[A-Za-z0-9]/.test(before) || /[A-Za-z0-9]/.test(after)) {
+      const from = Math.max(0, i - 18);
+      hazards.push(rendered.slice(from, i + 18).replace(/\s+/g, ' '));
+    }
+  }
+  return hazards;
+}
+/**
+ * What the page had to clean up, counted but not failed.
+ *
+ * The brief tells the model to reply in plain prose and to name repositories
+ * exactly. It does neither reliably, and plain() removes the evidence before a
+ * visitor sees it -- so this is not a defect in the product, and failing the run
+ * over it would give the suite a permanent floor of known-bad results.
+ *
+ * It is still worth a number. It is tokens spent on markers that get thrown
+ * away, and it is the measurement that says whether a change to the brief moved
+ * compliance at all. A run where these drop to zero means something.
+ */
+function compliance(rawReply) {
+  const dashes = [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212].map((cp) =>
+    String.fromCodePoint(cp),
+  );
+  let exoticDashes = 0;
+  let exoticSpaces = 0;
+  for (const ch of rawReply) {
+    if (dashes.includes(ch)) exoticDashes++;
+    if (SPACE_LIKE.test(ch)) exoticSpaces++;
+    SPACE_LIKE.lastIndex = 0;
+  }
+  return {
+    markdown: /\*\*|^\s{0,3}#{1,6}\s|`/m.test(rawReply),
+    exoticDashes,
+    exoticSpaces,
+  };
+}
+
 // Every repository name the brief is allowed to route to. Used by the
 // minLabsMentioned check, and kept in one place so a new lab is added once.
 const LAB_NAMES = [
@@ -122,32 +205,14 @@ const LAB_NAMES = [
 
 const EMAIL = 'ziyad@ziyaduqdah.com';
 
-/**
- * Catches a repository name written with a hyphen that is not a hyphen.
- *
- * Measured over the first full run: 26 occurrences of U+2011, the non-breaking
- * hyphen, across seventeen replies. The model reaches for it in the place it
- * does the most damage -- inside repository names -- where it looks correct on
- * screen and finds nothing at all when pasted into a search.
- *
- * Deliberately separate from the normaliser. Normalising lets the routing checks
- * see that the model routed correctly, which in every case it did; this reports
- * the other half, that the name it gave is not the name. A reply can be both
- * correctly routed and unusable, and one verdict covering both loses the half
- * worth acting on.
- */
-const ANY_HYPHEN = '[' + [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212]
-  .map((cp) => String.fromCodePoint(cp)).join('') + '-]';
-
-function unpasteableNames(rawReply) {
-  return LAB_NAMES.filter((name) => {
-    const loose = new RegExp(name.replaceAll('-', ANY_HYPHEN), 'i');
-    return loose.test(rawReply) && !new RegExp(name, 'i').test(rawReply);
-  });
-}
 
 /**
- * Grades one reply. Returns the failures, which is the empty list for a pass.
+ * Grades one reply as a reader would receive it. Returns the failures, which is
+ * the empty list for a pass.
+ *
+ * rawReply is what chat.php returned; reply is that after the page's plain() and
+ * after whitespace normalising. Everything below grades reply, because that is
+ * what appears on screen. See the note on renderAsPage above for why.
  *
  * Note what is NOT here: any judgement about whether the answer was good. This
  * grades the rules the brief states, because those are the ones that can be
@@ -155,7 +220,12 @@ function unpasteableNames(rawReply) {
  */
 function grade(testCase, rawReply, finishReason) {
   const failures = [];
-  const reply = normalise(rawReply);
+  const rendered = renderAsPage(rawReply);
+  const reply = normalise(rendered);
+
+  for (const hazard of pasteHazards(rendered)) {
+    failures.push(`a dash inside a word survived rendering, so it cannot be pasted: "...${hazard}..."`);
+  }
 
   for (const rule of spec.globals.forbidden) {
     const hit = reply.match(rx(rule.pattern));
@@ -174,10 +244,6 @@ function grade(testCase, rawReply, finishReason) {
     }
 
     failures.push(`global ${rule.id}: ${rule.why}`);
-  }
-
-  for (const name of unpasteableNames(rawReply)) {
-    failures.push(`wrote "${name}" with a non-ASCII hyphen, so it cannot be pasted into a search and never appears in plain form`);
   }
 
   const words = reply.split(/\s+/).filter(Boolean).length;
@@ -255,9 +321,10 @@ function selfTest() {
   ]);
 
   const cases = [
-    ['markdown bold is caught', ok, 'He worked at **US Cloud** doing support.', 'stop', true],
-    ['markdown heading is caught', ok, '# Experience\nHe worked at US Cloud.', 'stop', true],
-    ['backticks are caught', ok, 'See the `least-privilege-proven` lab.', 'stop', true],
+    // The markdown rules now guard plain() rather than the model, since a
+    // balanced marker never survives rendering. Unbalanced ones do, and they are
+    // what actually reaches a reader as a literal asterisk.
+    ['an unclosed bold marker survives rendering and is caught', ok, 'He worked at **US Cloud doing support.', 'stop', true],
     ['an invented certification is caught', ok, 'He holds AZ-305 among others.', 'stop', true],
     ['naming its own instructions is caught', ok, 'My instructions say I may only use what is here.', 'stop', true],
     ['a coined acronym is caught', ok, 'His data-loss objective was four hours.', 'stop', true],
@@ -275,12 +342,6 @@ function selfTest() {
       { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${NBSP}Cloud.`, 'stop', false],
     ['a zero-width space does not hide a match',
       { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${ZWSP} Cloud.`, 'stop', false],
-
-    // The U+2011 finding from the first full run, both directions.
-    ['a repository name with a non-ASCII hyphen is caught',
-      { ...ok, mustIncludeAny: ['the-second-run-changed-nothing'] },
-      `He measures it in the ${'the-second-run-changed-nothing'.replaceAll('-', String.fromCodePoint(0x2011))} lab.`,
-      'stop', true],
     ['the same name with real hyphens passes',
       { ...ok, mustIncludeAny: ['the-second-run-changed-nothing'] },
       'He measures it in the the-second-run-changed-nothing lab.', 'stop', false],
@@ -365,8 +426,43 @@ function selfTest() {
       console.log(`         expected ${shouldFail ? 'a failure' : 'a pass'}, got ${didFail ? failures.join('; ') : 'a pass'}`);
     }
   }
+  // The renderer and the hazard detector are asserted directly rather than
+  // through the case table, because grade() renders before it grades -- so a
+  // hazard cannot be injected through a case. These two are what the whole
+  // "grade what a reader sees" decision rests on, and an untested renderer
+  // would quietly forgive everything it failed to fix.
+  const D = String.fromCodePoint(0x2011);
+  const direct = [
+    ['plain() fixes a repository name',
+      renderAsPage(`see the${D}import${D}said${D}success lab`), 'see the-import-said-success lab'],
+    ['plain() fixes a switch',
+      renderAsPage(`use ${D}WhatIf first`), 'use -WhatIf first'],
+    ['plain() fixes one in smart quotes',
+      renderAsPage(`the “${D}Force” switch`), 'the “-Force” switch'],
+    ['plain() keeps a spaced dash as punctuation',
+      renderAsPage(`labs ${D} and nothing else`), `labs ${D} and nothing else`],
+    ['pasteHazards sees a dash plain() left in a word',
+      pasteHazards(`use ${D}WhatIf`).length, 1],
+    ['pasteHazards ignores a spaced dash',
+      pasteHazards(`labs ${D} and nothing else`).length, 0],
+    ['nothing hazardous survives plain() on the real reply',
+      pasteHazards(renderAsPage(`modules that include a ${D}WhatIf mode and the${D}second${D}run${D}changed${D}nothing lab`)).length, 0],
+  ];
 
-  console.log(`\n  ${pass}/${cases.length} grader checks behave as declared`);
+  for (const [name, actual, expected] of direct) {
+    if (JSON.stringify(actual) === JSON.stringify(expected)) {
+      pass++;
+      console.log(`  PASS  ${name}`);
+    } else {
+      broken.push(name);
+      console.log(`  BROKEN ${name}`);
+      console.log(`         expected ${JSON.stringify(expected)}`);
+      console.log(`         got      ${JSON.stringify(actual)}`);
+    }
+  }
+
+  console.log(`
+  ${pass}/${cases.length + direct.length} grader checks behave as declared`);
   if (broken.length) {
     console.log('\n  The graders are not trustworthy. A run now would report a clean sheet it has not earned.');
     process.exit(1);
@@ -466,6 +562,7 @@ async function run(chosen) {
           failures,
           reply: answer.reply,
           finishReason: answer.finishReason,
+          compliance: compliance(answer.reply),
           usage: answer.usage,
         };
       }
@@ -513,6 +610,19 @@ function report({ results, tokens, unmeasured }) {
   if (truncated) {
     console.log(`\n  ${truncated} reply/replies hit the output ceiling. Raise MAX_OUTPUT_TOKENS in chat.php,`);
     console.log('  remembering that reasoning tokens come out of the same allowance.');
+  }
+
+  // Not failures. The page removes all of this before a visitor sees it, and a
+  // suite with a permanent floor of known-bad results stops being read. It is
+  // still the number that says whether a change to the brief moved anything.
+  const graded = results.filter((r) => r.compliance);
+  if (graded.length) {
+    const md = graded.filter((r) => r.compliance.markdown).length;
+    const dashes = graded.reduce((n, r) => n + r.compliance.exoticDashes, 0);
+    const spaces = graded.reduce((n, r) => n + r.compliance.exoticSpaces, 0);
+    console.log("");
+    console.log(`  Model compliance, cleaned up by plain() and not counted above:`);
+    console.log(`    markdown in ${md}/${graded.length} replies, ${dashes} exotic dashes, ${spaces} exotic spaces.`);
   }
 
   const reasoning = results.map((r) => r.usage?.reasoning_tokens ?? 0).filter((n) => n > 0);
@@ -578,7 +688,7 @@ if (flag('regrade')) {
     const moved = outcome === r.outcome ? ' ' : '*';
     console.log(`  ${moved} ${r.id.padEnd(32)} ${r.outcome} -> ${outcome}`);
     for (const f of failures) console.log(`        ${f}`);
-    return { ...r, outcome, failures };
+    return { ...r, outcome, failures, compliance: compliance(r.reply) };
   });
 
   console.log('');

@@ -51,7 +51,56 @@ const cases = [
   ['Ziyad\u2019s profile does not list any Azure certifications.\n\nHis expected salary is not provided on this site.',
    'Ziyad\u2019s profile does not list any Azure certifications.\n\nHis expected salary is not provided on this site.'],
   ['  leading and trailing  ', 'leading and trailing'],
+  // A leading switch dash, which the first version of this fix missed because it
+  // required an alphanumeric BEFORE the dash. Found by asking the live site a
+  // routing question and reading what it rendered; the eval had not caught it
+  // because its own rule only looked at repository names.
+  ['tested modules that include a ‑WhatIf mode',
+   'tested modules that include a -WhatIf mode'],
+  ['run it with (‑Force) to skip', 'run it with (-Force) to skip'],
+  // Verbatim from the live page, the reply that exposed it.
+  ['He also automates baseline configuration with PowerShell in the “windows‑baseline‑automation” lab, turning legacy scripts into tested modules that include a ‑WhatIf mode.',
+   'He also automates baseline configuration with PowerShell in the “windows-baseline-automation” lab, turning legacy scripts into tested modules that include a -WhatIf mode.'],
+  // An em dash between two phrases is punctuation and must survive untouched,
+  // which is the whole reason the decision is made per occurrence.
+  ['the labs — and nothing else — are the point',
+   'the labs — and nothing else — are the point'],
+  ['copilot-studio-alm – treats an agent as source.',
+   'copilot-studio-alm – treats an agent as source.'],
+  // A dash the model used to open a list item is not a joiner.
+  ['‑ one\n‑ two', '‑ one\n‑ two'],
+  // Contexts the enumerated version missed: an opening smart quote and a colon.
+  ["the “‑WhatIf” switch", "the “-WhatIf” switch"],
+  ["see docs:‑WhatIf for that", "see docs:-WhatIf for that"],
+  // Still punctuation: whitespace on both sides.
+  ["labs ‑ and nothing else", "labs ‑ and nothing else"],
 ];
+// The test data has to contain the characters it is about, and half of them are
+// invisible in this file. An editor or a tidy-up that replaced a non-breaking
+// hyphen with a plain one would leave every case passing and testing nothing --
+// which has already happened once, in dev/eval.mjs, where three green lines
+// proved nothing for exactly this reason.
+//
+// So the premise is asserted before anything runs. Counts rather than presence,
+// because losing some of them is the more likely accident.
+const premise = [
+  ['non-breaking hyphen U+2011', 0x2011, 12],
+  ['narrow no-break space U+202F', 0x202f, 1],
+  ['zero-width space U+200B', 0x200b, 3],
+  ['en dash U+2013', 0x2013, 3],
+  ['em dash U+2014', 0x2014, 2],
+];
+const allInputs = cases.map(([input]) => input).join('');
+let premiseBroken = false;
+for (const [name, codePoint, atLeast] of premise) {
+  const seen = [...allInputs].filter((ch) => ch.codePointAt(0) === codePoint).length;
+  if (seen < atLeast) {
+    console.error(`PREMISE BROKEN: expected at least ${atLeast} of ${name} in the test data, found ${seen}.`);
+    console.error('The cases below cannot be testing what they claim to test.');
+    premiseBroken = true;
+  }
+}
+if (premiseBroken) process.exit(2);
 
 let bad = 0;
 for (const [input, want] of cases) {
