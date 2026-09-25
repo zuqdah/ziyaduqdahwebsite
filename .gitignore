@@ -8,3 +8,8 @@ _theme-preview.html
 .env
 .env.*
 private/
+
+# Eval output. Written per run, never committed: a graded report in the
+# repository would be read as the current behaviour of an endpoint that changes
+# whenever the brief or the model does.
+dev/eval-report.json
