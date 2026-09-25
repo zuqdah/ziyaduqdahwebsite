@@ -35,7 +35,10 @@ const REPORT = resolve(here, 'eval-report.json');
 
 const DEFAULT_URL = 'https://ziyaduqdah.com/chat.php';
 const DEFAULT_PACE = 75;          // seconds; see the note above
-const EST_TOKENS_PER_CALL = 2900; // brief + one question + one reply, no history
+// Measured, not guessed: the first live call reported prompt=2308, completion=60,
+// reasoning=22, total=2368. Rounded up for the routing cases, whose answers are
+// longer than "he works at US Cloud".
+const EST_TOKENS_PER_CALL = 2600;
 
 /* ------------------------------------------------------------------ arguments */
 
@@ -51,6 +54,31 @@ const spec = JSON.parse(readFileSync(SPEC, 'utf8'));
 /* ------------------------------------------------------------------- graders */
 
 const rx = (pattern) => new RegExp(pattern, 'i');
+
+/**
+ * Normalises the whitespace a language model actually emits.
+ *
+ * The first real run graded a correct answer as a failure. The reply said
+ * "Senior Microsoft Systems Engineer in Premier Support at US Cloud" and the
+ * check for "US Cloud" did not match, because the space between US and Cloud was
+ * U+202F, a narrow no-break space. Models reach for these constantly -- narrow
+ * and non-breaking spaces, thin spaces, zero-width joiners -- and every one of
+ * them turns an exact string check into a coin toss.
+ *
+ * The fix belongs here and not in the patterns. Loosening every pattern to
+ * tolerate exotic whitespace would mean writing s+ everywhere and hoping, and
+ * a pattern nobody can read stops being a specification. Normalise the input,
+ * keep the patterns literal.
+ *
+ * This is also why the baseline cases exist: without a case asking something the
+ * brief states plainly, this would have read as the model failing to name the
+ * employer rather than the grader failing to see it.
+ */
+function normalise(text) {
+  return text
+    .replace(/[​‌‍⁠﻿]/g, '')          // zero width: remove
+    .replace(/[   -   　]/g, ' '); // space-like: make it a space
+}
 
 // Every repository name the brief is allowed to route to. Used by the
 // minLabsMentioned check, and kept in one place so a new lab is added once.
@@ -73,8 +101,9 @@ const EMAIL = 'ziyad@ziyaduqdah.com';
  * grades the rules the brief states, because those are the ones that can be
  * checked the same way twice.
  */
-function grade(testCase, reply, finishReason) {
+function grade(testCase, rawReply, finishReason) {
   const failures = [];
+  const reply = normalise(rawReply);
 
   for (const rule of spec.globals.forbidden) {
     if (rx(rule.pattern).test(reply)) {
@@ -137,6 +166,25 @@ function grade(testCase, reply, finishReason) {
  */
 function selfTest() {
   const ok = { id: 'x', question: 'q' };
+
+  // Built from code points rather than written as escapes in a string literal.
+  // The first attempt at these cases wrote   into the source and it arrived
+  // as a plain space, so all three passed without the normaliser doing anything
+  // -- three green lines proving nothing, in the fix for a grader that had
+  // already graded a correct answer wrong. The assertion below makes that
+  // failure mode impossible to repeat quietly.
+  const NNBSP = String.fromCodePoint(0x202f);  // narrow no-break space
+  const NBSP = String.fromCodePoint(0x00a0);   // no-break space
+  const ZWSP = String.fromCodePoint(0x200b);   // zero-width space
+
+  // Any case named here asserts its own premise: the raw reply must NOT match
+  // the literal pattern, or the case is vacuous and the run stops.
+  const needsNormalising = new Set([
+    'a narrow no-break space does not hide a match',
+    'a non-breaking space does not hide a match',
+    'a zero-width space does not hide a match',
+  ]);
+
   const cases = [
     ['markdown bold is caught', ok, 'He worked at **US Cloud** doing support.', 'stop', true],
     ['markdown heading is caught', ok, '# Experience\nHe worked at US Cloud.', 'stop', true],
@@ -147,6 +195,17 @@ function selfTest() {
     ['an overlong reply is caught', ok, 'word '.repeat(spec.globals.maxWords + 10), 'stop', true],
     ['truncation is caught', ok, 'He works at US Cloud and', 'length', true],
     ['a clean reply passes', ok, 'He works at US Cloud as a Senior Microsoft Systems Engineer.', 'stop', false],
+
+    // Regression: the exact reply the first live run returned, including the
+    // narrow no-break space the model really put between US and Cloud.
+    ['a narrow no-break space does not hide a match',
+      { ...ok, mustIncludeAll: ['US Cloud'] },
+      `Ziyad is currently a Senior Microsoft Systems Engineer in Premier Support at US${NNBSP}Cloud, a role he has held since December 2023.`,
+      'stop', false],
+    ['a non-breaking space does not hide a match',
+      { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${NBSP}Cloud.`, 'stop', false],
+    ['a zero-width space does not hide a match',
+      { ...ok, mustIncludeAll: ['US Cloud'] }, `He works at US${ZWSP} Cloud.`, 'stop', false],
 
     ['a missing required string is caught',
       { ...ok, mustIncludeAll: ['US Cloud'] }, 'He works somewhere in Louisiana.', 'stop', true],
@@ -193,6 +252,20 @@ function selfTest() {
   const broken = [];
 
   for (const [name, testCase, reply, finish, shouldFail] of cases) {
+    // A whitespace case whose reply would match anyway is testing nothing. This
+    // is what caught the first attempt, where the escape collapsed to a plain
+    // space and three cases went green without the normaliser being involved.
+    if (needsNormalising.has(name)) {
+      const pattern = testCase.mustIncludeAll[0];
+      if (new RegExp(pattern, 'i').test(reply)) {
+        console.log(`  VACUOUS ${name}`);
+        console.log(`         the reply matches /${pattern}/ without normalising, so this case proves nothing.`);
+        console.log('         The exotic whitespace it is supposed to contain is not there.');
+        broken.push(name);
+        continue;
+      }
+    }
+
     const failures = grade(testCase, reply, finish);
     const didFail = failures.length > 0;
     if (didFail === shouldFail) {
