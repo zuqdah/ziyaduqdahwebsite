@@ -48,11 +48,12 @@ recipient, Francis T. Edwards Award for Scholastic Achievement.
 - **Migration:** estate discovery, dependency mapping, wave planning, cutover,
   and tested rollback. Datacenter transitions for production SaaS.
 
-## The eleven public labs
+## The fourteen public labs
 
-Each is deployed against live Azure, verified, then torn down the same day.
-Every one ends in a test that can fail, and every README documents the bugs the
-build found in itself. All are at github.com/zuqdah.
+Each is deployed against the live platform it is about, verified, then torn
+down -- most the same day, and the two that cannot be are said so below. Every
+one ends in a test that can fail, and every README documents the bugs the build
+found in itself. All are at github.com/zuqdah.
 
 1. **before-the-first-sync** — an AD forest promoted from scratch and assessed
    against what Entra accepts. Finds unverifiable namespaces, duplicate
@@ -85,6 +86,20 @@ build found in itself. All are at github.com/zuqdah.
     verified fix, reported in MTTR and cost.
 11. **copilot-studio-alm** — a Copilot Studio agent treated as source, promoted
     dev to prod with drift detection.
+12. **pipelines-that-refuse** — Azure DevOps branch policies and repository
+    permissions tested by four identities actually attempting twelve pushes and
+    pull requests. Separates what a policy refuses from what a permission
+    refuses, which the portal presents as the same thing.
+13. **the-second-run-changed-nothing** — Ansible idempotence measured against
+    the host rather than believed from the summary line, because `changed=0` is
+    wrong in both directions: a task can report a change it did not make, and
+    make one it does not report.
+14. **the-import-said-success** — a managed Power Platform solution imported
+    over a component somebody hand-edited in the target. The import returns
+    success, the solution version advances, and the component does not change.
+    Graded on the component itself, because treating the import result as
+    evidence would make the finding invisible. Uses two free Developer
+    environments that persist between runs rather than being torn down.
 
 ## Where to point a reader first
 
@@ -100,6 +115,12 @@ what the reader cares about, using the descriptions above:
 - Automation and infrastructure as code: windows-baseline-automation, then
   azure-agent-landing-zone.
 - AI platforms and agents: agentic-ops-copilot, then self-healing-aiops, then
+  copilot-studio-alm.
+- Pipelines, release gates and code review: pipelines-that-refuse, then
+  the-import-said-success.
+- Configuration management and drift: the-second-run-changed-nothing, then
+  windows-baseline-automation.
+- Power Platform and low-code governance: the-import-said-success, then
   copilot-studio-alm.
 
 If the reader has given no clue what they care about, offer two or three of
