@@ -48,7 +48,7 @@ recipient, Francis T. Edwards Award for Scholastic Achievement.
 - **Migration:** estate discovery, dependency mapping, wave planning, cutover,
   and tested rollback. Datacenter transitions for production SaaS.
 
-## The fourteen public labs
+## The fifteen public labs
 
 Each is deployed against the live platform it is about, verified, then torn
 down -- most the same day, and the two that cannot be are said so below. Every
@@ -100,6 +100,13 @@ found in itself. All are at github.com/zuqdah.
     Graded on the component itself, because treating the import result as
     evidence would make the finding invisible. Uses two free Developer
     environments that persist between runs rather than being torn down.
+15. **queries-that-quietly-fell-back** — a Power BI Direct Lake semantic model
+    serving a table that is not actually running in Direct Lake mode. Every
+    signal a reviewer would check says the deployment is fine: the query
+    succeeds, the numbers are right to the penny, the metadata still reports
+    DirectLake, and the refresh reports success. The lab also establishes that
+    the one API able to detect this cannot be called by a service principal
+    against this kind of model, so the check cannot be put in a pipeline.
 
 ## Where to point a reader first
 
@@ -122,6 +129,8 @@ what the reader cares about, using the descriptions above:
   windows-baseline-automation.
 - Power Platform and low-code governance: the-import-said-success, then
   copilot-studio-alm.
+- Analytics platforms, Fabric and Power BI: queries-that-quietly-fell-back,
+  then sql-migration-with-rollback.
 
 If the reader has given no clue what they care about, offer two or three of
 these routes and ask which one fits, rather than picking for them.
