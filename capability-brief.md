@@ -48,7 +48,7 @@ recipient, Francis T. Edwards Award for Scholastic Achievement.
 - **Migration:** estate discovery, dependency mapping, wave planning, cutover,
   and tested rollback. Datacenter transitions for production SaaS.
 
-## The fifteen public labs
+## The sixteen public labs
 
 Each is deployed against the live platform it is about, verified, then torn
 down -- most the same day, and the two that cannot be are said so below. Every
@@ -107,6 +107,14 @@ found in itself. All are at github.com/zuqdah.
     DirectLake, and the refresh reports success. The lab also establishes that
     the one API able to detect this cannot be called by a service principal
     against this kind of model, so the check cannot be put in a pipeline.
+16. **the-database-was-not-busy** — an Azure SQL Database held flat against a
+    hard transaction-log write ceiling while reporting 8% CPU and 0% data IO.
+    Two results beyond the headline: the throttled workload is the FASTEST of
+    the three measured, because reaching a rate limit requires going fast, so
+    "it is slow, it must be throttled" is backwards; and three nonclustered
+    indexes cost 3.4 times the log for identical rows while taking CPU from 8%
+    to over 20%, so fixing one bottleneck creates another. The ceiling is
+    written down in one DMV column and nowhere else.
 
 ## Where to point a reader first
 
@@ -130,6 +138,8 @@ what the reader cares about, using the descriptions above:
 - Power Platform and low-code governance: the-import-said-success, then
   copilot-studio-alm.
 - Analytics platforms, Fabric and Power BI: queries-that-quietly-fell-back,
+  then sql-migration-with-rollback.
+- Database performance and cloud resource limits: the-database-was-not-busy,
   then sql-migration-with-rollback.
 
 If the reader has given no clue what they care about, offer two or three of
