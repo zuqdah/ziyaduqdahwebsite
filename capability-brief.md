@@ -48,7 +48,7 @@ recipient, Francis T. Edwards Award for Scholastic Achievement.
 - **Migration:** estate discovery, dependency mapping, wave planning, cutover,
   and tested rollback. Datacenter transitions for production SaaS.
 
-## The sixteen public labs
+## The seventeen public labs
 
 Each is deployed against the live platform it is about, verified, then torn
 down -- most the same day, and the two that cannot be are said so below. Every
@@ -115,6 +115,20 @@ found in itself. All are at github.com/zuqdah.
     indexes cost 3.4 times the log for identical rows while taking CPU from 8%
     to over 20%, so fixing one bottleneck creates another. The ceiling is
     written down in one DMV column and nowhere else.
+17. **the-rows-that-failed-and-loaded-anyway** — a Databricks Lakeflow
+    declarative pipeline that declares two data-quality constraints, reports
+    COMPLETED, and loads all 340 rows that violated them. dlt.expect records
+    the violation and admits the row; only expect_or_drop removes it and only
+    expect_or_fail refuses the update. Three signals all fail to reveal it: the
+    pipeline state is identical to a clean run, the row count reconciles exactly
+    because nothing was discarded, and the violation is logged at INFO — the
+    only action that logs at ERROR is the one that already stopped the update.
+    Two further results: expect_or_fail reports one failed record against 340
+    for the same data, because it aborts on the first violation, so the
+    strictest action tells you least about how bad the data is; and the
+    Databricks CLI does not return the event-log field that carries any of
+    these numbers, so read through the CLI a violated pipeline is
+    indistinguishable from one that declared nothing.
 
 ## Where to point a reader first
 
@@ -141,6 +155,8 @@ what the reader cares about, using the descriptions above:
   then sql-migration-with-rollback.
 - Database performance and cloud resource limits: the-database-was-not-busy,
   then sql-migration-with-rollback.
+- Data engineering and data quality: the-rows-that-failed-and-loaded-anyway,
+  then the-second-run-changed-nothing.
 
 If the reader has given no clue what they care about, offer two or three of
 these routes and ask which one fits, rather than picking for them.
