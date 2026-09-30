@@ -282,8 +282,24 @@ function grade(testCase, rawReply, finishReason) {
     }
   }
 
-  if (testCase.mustAskQuestion && !reply.includes('?')) {
-    failures.push('did not ask the reader which route fits');
+  /*
+   * The brief asks the assistant to hand the choice of route to the reader.
+   * This used to be tested as `reply.includes('?')`, which is punctuation
+   * standing in for behaviour -- and the stand-in failed: a reply that offered
+   * three routes and twice invited the reader to pick ("If you tell me what
+   * you're most interested in...", "Let me know which area matters most to
+   * you") was graded as not asking, because neither sentence ended in a
+   * question mark. The behaviour was right and the check was wrong.
+   *
+   * Note this check does not have to carry the whole case on its own:
+   * minLabsMentioned already requires the routes to be there, so all this has
+   * to establish is that the decision was handed over rather than made for the
+   * reader.
+   */
+  const INVITES_CHOICE =
+    /\?|\b(?:let me know|tell me|if you tell me|say which|which of these|whichever|what matters most|what you care about|what you are most interested in|what you're most interested in)\b/i;
+  if (testCase.mustAskQuestion && !INVITES_CHOICE.test(reply)) {
+    failures.push('did not invite the reader to choose a route');
   }
 
   return failures;
@@ -382,8 +398,26 @@ function selfTest() {
       { ...ok, minLabsMentioned: 2 },
       'Start with least-privilege-proven, or sql-migration-with-rollback if migration is the worry.', 'stop', false],
 
-    ['not asking the reader is caught',
+    /*
+     * This check had only a negative control until 2026-09-30, which is how it
+     * went a month testing for a question mark instead of for an invitation.
+     * A check shown only a reply it should catch can be broken in the
+     * too-strict direction indefinitely: it keeps catching, and nothing ever
+     * demonstrates that it lets a good reply through.
+     */
+    ['not inviting the reader is caught',
       { ...ok, mustAskQuestion: true }, 'Start with least-privilege-proven.', 'stop', true],
+    ['an interrogative invitation passes',
+      { ...ok, mustAskQuestion: true },
+      'Either least-privilege-proven or sql-migration-with-rollback. Which fits what you care about?', 'stop', false],
+    ['an imperative invitation passes too',
+      { ...ok, mustAskQuestion: true },
+      'Either least-privilege-proven or sql-migration-with-rollback. Let me know which area matters most to you and I will point you at one.',
+      'stop', false],
+    ['a reply that picks for the reader is still caught',
+      { ...ok, mustAskQuestion: true },
+      'Start with least-privilege-proven, then sql-migration-with-rollback. That is the right order for everyone.',
+      'stop', true],
 
     // The Terraform patterns are the subtlest thing in the spec: they must catch
     // a fabricated duration for Terraform without catching the career total,
