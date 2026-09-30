@@ -120,6 +120,18 @@ section+section{border-top:1px solid var(--rule);}
 .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s2);}
 @media (max-width:1000px){.grid-4{grid-template-columns:repeat(2,1fr);}}
 @media (max-width:700px){.grid-4,.grid-2{grid-template-columns:1fr;}}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);}
+@media (max-width:1000px){.grid-3{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:700px){.grid-3{grid-template-columns:1fr;}}
+/* Evidence inside a focus card. Static markup, so it reads with the GitHub API down. */
+.card.has-proof .tags{margin-top:0;}
+.card .proof{margin-top:auto;padding-top:var(--s2);border-top:1px solid var(--rule);display:flex;flex-direction:column;gap:.55rem;}
+.proof-head{font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);}
+.proof-lab{display:block;color:var(--ink);text-decoration:none;border-radius:var(--r-sm);}
+.proof-lab b{display:block;font-size:.86rem;font-weight:700;letter-spacing:-.01em;color:var(--accent);word-break:break-word;}
+.proof-lab span{display:block;font-size:.82rem;line-height:1.45;color:var(--ink-2);}
+.proof-lab:hover b,.proof-lab:focus-visible b{text-decoration:underline;}
+.proof-lab[hidden]{display:none;}
 
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);display:flex;flex-direction:column;gap:.65rem;box-shadow:var(--shadow-1);}
 .card .num{font-size:.75rem;font-weight:700;color:var(--accent);letter-spacing:.08em;}
@@ -323,7 +335,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   <div class="wrap">
     <p class="eyebrow">Cloud &amp; Infrastructure Architecture</p>
     <h1>Ziyad Uqdah</h1>
-    <p class="role">Senior Systems Engineer — Azure and hybrid cloud architecture, enterprise migration, data platforms, and disaster recovery.</p>
+    <p class="role">Senior Systems Engineer | Cloud, Data Platforms &amp; Analytics | DevOps, Migrations &amp; Integrations</p>
     <p class="lede">Nineteen-plus years across systems administration, infrastructure engineering, and cloud architecture. I work on the parts of a migration that carry real risk: <strong>estate discovery, wave planning, cutover, and recovery that has been tested rather than assumed.</strong> Datacenter transitions for production SaaS, SQL Server platform modernization, and DR runbooks written against contractual SLA, RTO, and RPO targets.</p>
     <div class="locline">
       <span>New Orleans, LA</span>
@@ -350,33 +362,83 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">What I build</p>
-      <h2>Four areas where the work is hardest to fake</h2>
-      <p>Migrations rarely fail on the technology. They fail on the dependency nobody mapped, the runbook nobody tested, and the cutover window that turned out to be four hours shorter than it needed to be. These are the areas I have spent a career in.</p>
+      <h2>Six areas, each with the work to show for it</h2>
+      <p>Migrations rarely fail on the technology. They fail on the dependency nobody mapped, the runbook nobody tested, and the cutover window that turned out to be four hours shorter than it needed to be. These are the areas I have spent a career in — and under each one, a lab built and measured against the live platform rather than described.</p>
     </div>
-    <div class="grid-4">
-      <div class="card">
+    <!-- Each card carries its evidence statically, so it reads without JavaScript
+         and without the GitHub API. The feed script below only removes a link if
+         its repository has stopped being a published lab; it never adds one. -->
+    <div class="grid-3">
+      <div class="card has-proof">
         <span class="num">01</span>
         <h3>Cloud &amp; hybrid architecture</h3>
         <p>Azure landing zones, hybrid connectivity, and identity integration designed so the foundation is reproducible rather than a set of portal clicks nobody can repeat.</p>
-        <div class="tags">Azure · AWS · GCP · Hybrid AD/Entra</div>
+        <div class="tags">Azure · AWS · GCP · Hybrid AD/Entra · Terraform</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="azure-agent-landing-zone" href="https://github.com/zuqdah/azure-agent-landing-zone" target="_blank" rel="noopener"><b>azure-agent-landing-zone</b><span>A Terraform landing zone deployed by GitHub Actions with no stored cloud credentials — every hop on managed identity, spend bounded by design.</span></a>
+          <a class="proof-lab" data-lab="entra-cutover-without-lockout" href="https://github.com/zuqdah/entra-cutover-without-lockout" target="_blank" rel="noopener"><b>entra-cutover-without-lockout</b><span>Conditional Access evaluated against a declared sign-in matrix before enforcement: 7 of 7 scenarios as declared, 0 lockouts.</span></a>
+          <a class="proof-lab" data-lab="least-privilege-proven" href="https://github.com/zuqdah/least-privilege-proven" target="_blank" rel="noopener"><b>least-privilege-proven</b><span>RBAC in Terraform, then each identity signs in and attempts what it must not. The pipeline fails if anything succeeds.</span></a>
+        </div>
       </div>
-      <div class="card">
+      <div class="card has-proof">
         <span class="num">02</span>
-        <h3>Datacenter &amp; workload migration</h3>
+        <h3>Migrations &amp; cutover</h3>
         <p>Moving real estates, not lab samples. Dependency mapping, wave planning, rehost-versus-replatform calls, a pilot wave before the fleet, and a rollback path worth using.</p>
-        <div class="tags">VMware · Hyper-V · Colocation · Cutover planning</div>
+        <div class="tags">VMware · Hyper-V · Colocation · Cutover planning · Hybrid identity</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="sql-migration-with-rollback" href="https://github.com/zuqdah/sql-migration-with-rollback" target="_blank" rel="noopener"><b>sql-migration-with-rollback</b><span>Refuses a source that is not migratable, proves parity by content checksum rather than row count, and restores the rollback to show it works.</span></a>
+          <a class="proof-lab" data-lab="before-the-first-sync" href="https://github.com/zuqdah/before-the-first-sync" target="_blank" rel="noopener"><b>before-the-first-sync</b><span>Everything that has to be right before a forest syncs to Entra ID, checked against a real forest built from scratch and torn down in the same job.</span></a>
+        </div>
       </div>
-      <div class="card">
+      <div class="card has-proof">
         <span class="num">03</span>
-        <h3>Data platform modernization</h3>
-        <p>SQL Server version upgrades and platform transitions, with performance baselines captured before and after, plus warehouse and analytics work across modern platforms.</p>
-        <div class="tags">SQL Server · PostgreSQL · Snowflake · Databricks · Fabric</div>
+        <h3>Data platforms &amp; analytics</h3>
+        <p>SQL Server upgrades and platform transitions with performance baselines captured before and after, plus the warehouse and analytics layer on top — and the ways it quietly stops being trustworthy.</p>
+        <div class="tags">SQL Server · Azure SQL · PostgreSQL · Databricks · Fabric · Power BI</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="the-database-was-not-busy" href="https://github.com/zuqdah/the-database-was-not-busy" target="_blank" rel="noopener"><b>the-database-was-not-busy</b><span>An Azure SQL database held at 98% of its log-write ceiling while reporting 8% CPU. The throttled workload was the fastest of the three.</span></a>
+          <a class="proof-lab" data-lab="queries-that-quietly-fell-back" href="https://github.com/zuqdah/queries-that-quietly-fell-back" target="_blank" rel="noopener"><b>queries-that-quietly-fell-back</b><span>A Direct Lake model that silently fell back to DirectQuery, and the one API able to detect it cannot be put in a pipeline.</span></a>
+          <a class="proof-lab" data-lab="the-rows-that-failed-and-loaded-anyway" href="https://github.com/zuqdah/the-rows-that-failed-and-loaded-anyway" target="_blank" rel="noopener"><b>the-rows-that-failed-and-loaded-anyway</b><span>A Databricks pipeline declared two constraints, reported COMPLETED, and loaded all 340 rows that broke them.</span></a>
+        </div>
       </div>
-      <div class="card">
+      <div class="card has-proof">
         <span class="num">04</span>
-        <h3>Resilience &amp; disaster recovery</h3>
-        <p>DR designed against the SLA, RTO, and RPO actually committed to in customer contracts — with runbooks written so someone other than the author can execute them.</p>
-        <div class="tags">Replication · Backup architecture · Runbooks · Failover testing</div>
+        <h3>DevOps &amp; automation</h3>
+        <p>Release gates that have been tested rather than trusted, baselines declared as data, and idempotence measured against the host — so the second run genuinely changes nothing.</p>
+        <div class="tags">Azure DevOps · GitHub Actions · Terraform · Ansible · PowerShell</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="pipelines-that-refuse" href="https://github.com/zuqdah/pipelines-that-refuse" target="_blank" rel="noopener"><b>pipelines-that-refuse</b><span>Branch policies, review rules and environment approvals with every bypass attempted for real against a live project, and graded.</span></a>
+          <a class="proof-lab" data-lab="the-second-run-changed-nothing" href="https://github.com/zuqdah/the-second-run-changed-nothing" target="_blank" rel="noopener"><b>the-second-run-changed-nothing</b><span>Ansible idempotence measured against a host fingerprint, because changed=0 is wrong in both directions.</span></a>
+          <a class="proof-lab" data-lab="windows-baseline-automation" href="https://github.com/zuqdah/windows-baseline-automation" target="_blank" rel="noopener"><b>windows-baseline-automation</b><span>A legacy hardening script turned into a tested module that audits, remediates only drift, and supports -WhatIf — with no RDP and no credentials on the wire.</span></a>
+        </div>
+      </div>
+      <div class="card has-proof">
+        <span class="num">05</span>
+        <h3>Integrations &amp; resilience</h3>
+        <p>Message pipelines built for the failure at 2am, and DR designed against the SLA, RTO, and RPO actually committed to in customer contracts — with runbooks someone other than the author can execute.</p>
+        <div class="tags">Service Bus · Replication · Backup architecture · Failover testing</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="integration-that-survives-failure" href="https://github.com/zuqdah/integration-that-survives-failure" target="_blank" rel="noopener"><b>integration-that-survives-failure</b><span>Duplicate delivery, poison messages and a consumer dying mid-work, each provoked and survived against a real Service Bus namespace.</span></a>
+          <a class="proof-lab" data-lab="disaster-recovery-actually-failed-over" href="https://github.com/zuqdah/disaster-recovery-actually-failed-over" target="_blank" rel="noopener"><b>disaster-recovery-actually-failed-over</b><span>A cross-region failover with recovery time measured from the first failed write and data loss counted, not quoted — graded against the objectives the plan claims.</span></a>
+        </div>
+      </div>
+      <div class="card has-proof">
+        <span class="num">06</span>
+        <h3>AI platforms &amp; low-code governance</h3>
+        <p>Agents that call real tools and cannot change anything without a person approving it, and low-code products treated as source — with a diff, a review, and a promotion path that says what it will change first.</p>
+        <div class="tags">Foundry · MCP · Copilot Studio · Power Platform</div>
+        <div class="proof">
+          <span class="proof-head">Proven in</span>
+          <a class="proof-lab" data-lab="agentic-ops-copilot" href="https://github.com/zuqdah/agentic-ops-copilot" target="_blank" rel="noopener"><b>agentic-ops-copilot</b><span>An agent that investigates Azure through an MCP server and cannot change anything without a human approving it. The model never approves its own actions.</span></a>
+          <a class="proof-lab" data-lab="self-healing-aiops" href="https://github.com/zuqdah/self-healing-aiops" target="_blank" rel="noopener"><b>self-healing-aiops</b><span>An agent diagnoses, policy — not the model — decides whether the fix may run unattended, and every incident is measured in time-to-recovery and dollars.</span></a>
+          <a class="proof-lab" data-lab="copilot-studio-alm" href="https://github.com/zuqdah/copilot-studio-alm" target="_blank" rel="noopener"><b>copilot-studio-alm</b><span>A Copilot Studio agent kept as source in git and promoted dev to prod by a script that reports what it will change before it changes it.</span></a>
+          <a class="proof-lab" data-lab="the-import-said-success" href="https://github.com/zuqdah/the-import-said-success" target="_blank" rel="noopener"><b>the-import-said-success</b><span>A managed Power Platform import that reports success, advances the version, and changes nothing — the hand edit in the target wins.</span></a>
+        </div>
       </div>
     </div>
   </div>
@@ -687,16 +749,6 @@ nav.main .navlink-btn:hover{color:var(--ink);}
       <div class="gh-repos" id="gh-repos" hidden></div>
       <p class="gh-empty" id="gh-empty">Published labs appear here automatically as each build lands on GitHub — every repository ships with its architecture diagram, infrastructure-as-code, and a written summary of what was proven.</p>
     </div>
-
-    <h3 class="sub-head">In the pipeline</h3>
-    <div class="grid-2">
-      <div class="lab">
-        <span class="status">In build</span>
-        <h3>Warehouse and analytics on a migrated estate</h3>
-        <p>What comes after the migration itself: ingestion from a managed SQL platform into a warehouse and an analytics layer, with the modelling and refresh choices that decide whether the reports on top stay trustworthy. The migration and rollback half is already published above.</p>
-        <div class="stack"><span class="chip">Snowflake</span><span class="chip">Databricks</span><span class="chip">Fabric</span><span class="chip">Power BI</span></div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -858,6 +910,14 @@ nav.main .navlink-btn:hover{color:var(--ink);}
              typeof r.html_url==='string' && r.html_url.indexOf('https://github.com/')===0;
     }).sort(function(a,b){return new Date(b.pushed_at)-new Date(a.pushed_at);});
     if(!labs.length){return;}
+
+    /* The focus cards name their labs statically. Once the live list is known,
+       drop any card link whose repository is no longer a published lab, so an
+       untagged or removed repo never leaves a dead link under a specialty. This
+       only ever removes; with the API unreachable the static links stand. */
+    var live={}; labs.forEach(function(r){live[r.name]=true;});
+    var proofs=document.querySelectorAll('.proof-lab[data-lab]');
+    for(var i=0;i<proofs.length;i++){ if(!live[proofs[i].getAttribute('data-lab')]){proofs[i].hidden=true;} }
 
     box.textContent='';
     labs.forEach(function(r){
