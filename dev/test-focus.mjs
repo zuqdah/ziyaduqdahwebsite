@@ -59,6 +59,13 @@ check(cards === 6, 'six specialty cards', 'found ' + cards);
 const heads = (focus.match(/class="proof-head"/g) || []).length;
 check(heads === cards, 'every card has a Proven-in block', heads + ' blocks for ' + cards + ' cards');
 
+// The evidence block must sit directly under the card's tags. It once carried
+// margin-top:auto, which pins it to the bottom of the card -- so in a grid row
+// where one card lists four labs and its neighbour two, the shorter card grew a
+// hole between its tags and its evidence. Found by Ziyad looking at the live
+// page, after every scaled-down screenshot and every count-based check passed.
+check(!/\.card \.proof\{[^}]*margin-top:\s*auto/.test(html), 'the Proven-in block is not pinned to the bottom of its card');
+
 // A stale claim that used to live in the labs section. It said an analytics lab
 // was "In build" after the Fabric and Databricks labs had been published, which
 // is the kind of thing a hiring manager notices and the author never does.
