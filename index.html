@@ -193,15 +193,13 @@ section+section{border-top:1px solid var(--rule);}
 .gh-head .btn{margin-left:auto;}
 @media (max-width:560px){.gh-head .btn{margin-left:0;width:100%;}}
 .gh-empty{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--rule);font-size:.93rem;color:var(--ink-2);max-width:var(--prose);}
-.gh-repos{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--rule);display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s2);}
+.gh-repos{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--rule);display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem var(--s3);}
 @media (max-width:700px){.gh-repos{grid-template-columns:1fr;}}
 .gh-repos[hidden],.gh-empty[hidden]{display:none;}
-.repo{display:flex;flex-direction:column;gap:.5rem;background:var(--ground);border:1px solid var(--rule);border-radius:var(--r-sm);padding:var(--s2) var(--s3);color:var(--ink);transition:border-color .16s ease;}
+.repo{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.15rem var(--s2);background:var(--ground);border:1px solid var(--rule);border-radius:var(--r-sm);padding:.5rem .8rem;color:var(--ink);transition:border-color .16s ease;}
 .repo:hover{border-color:var(--accent);color:var(--ink);}
-.repo-name{font-size:.98rem;font-weight:700;letter-spacing:-.015em;color:var(--accent);word-break:break-word;}
-.repo p{font-size:.9rem;color:var(--ink-2);}
-.repo-topics{display:flex;flex-wrap:wrap;gap:.35rem;}
-.repo-foot{margin-top:auto;display:flex;flex-wrap:wrap;gap:.3rem var(--s2);font-size:.78rem;font-weight:500;color:var(--ink-3);}
+.repo-name{font-size:.9rem;font-weight:700;letter-spacing:-.015em;color:var(--accent);word-break:break-word;}
+.repo-foot{display:inline-flex;flex-wrap:wrap;gap:.2rem var(--s2);font-size:.76rem;font-weight:500;color:var(--ink-3);white-space:nowrap;}
 .repo-foot .lang{display:inline-flex;align-items:center;gap:.4rem;}
 .repo-foot .lang i{width:9px;height:9px;border-radius:50%;display:block;}
 .sub-head{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:var(--s5) 0 var(--s3);}
@@ -280,7 +278,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   font-family:var(--f);font-size:.875rem;font-weight:600;line-height:1;padding:.78rem 1.15rem;
   border:1px solid transparent;border-radius:999px;cursor:pointer;
   background:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow-2);
-  transition:transform .16s ease,box-shadow .16s ease;}
+  transition:transform .16s ease,box-shadow .16s ease,opacity .16s ease,visibility .16s;}
 .ask-fab:hover{transform:translateY(-1px);}
 .ask-fab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
@@ -314,6 +312,10 @@ nav.main .navlink-btn:hover{color:var(--ink);}
 @media (max-width:640px){
   .ask-panel{left:var(--s2);right:var(--s2);bottom:var(--s2);width:auto;max-height:calc(100vh - 5.5rem);}
   body.ask-open .ask-fab{display:none;}  /* the panel covers the screen here; the close button is the way out */
+  /* On a phone the pill sat on top of the location chips on the first screen.
+     It now waits until the reader has started to scroll. Without JavaScript
+     the class is never added and the pill is simply always there. */
+  .ask-fab.is-tucked{opacity:0;visibility:hidden;transform:translateY(8px);pointer-events:none;}
 }
 </style>
 </head>
@@ -723,7 +725,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
     <div class="sec-head">
       <p class="eyebrow">Labs &amp; projects</p>
       <h2>Built in the lab, not just on the slide</h2>
-      <p>Production experience is the record. These are the environments I stand up on my own time to keep the reference architectures current — and to have something to point at rather than describe.</p>
+      <p>Production experience is the record. These are the environments I stand up on my own time to keep the reference architectures current — and to have something to point at rather than describe. Each one is described under the specialty it proves, above; this is the full list, most recently updated first.</p>
     </div>
 
     <div class="gh" id="gh">
@@ -752,15 +754,11 @@ nav.main .navlink-btn:hover{color:var(--ink);}
     <div class="skills">
       <div class="skillrow">
         <h4>Cloud &amp; virtualization</h4>
-        <div><span class="chip">Azure</span><span class="chip">AWS</span><span class="chip">GCP</span><span class="chip">VMware</span><span class="chip">Hyper-V</span><span class="chip">Akamai Cloud Manager</span><span class="chip">Rackspace Cloud</span></div>
+        <div><span class="chip">Azure</span><span class="chip">AWS</span><span class="chip">GCP</span><span class="chip">VMware</span><span class="chip">Hyper-V</span></div>
       </div>
       <div class="skillrow">
         <h4>Databases &amp; data platforms</h4>
         <div><span class="chip">SQL Server</span><span class="chip">Azure SQL</span><span class="chip">PostgreSQL</span><span class="chip">MySQL</span><span class="chip">Snowflake</span><span class="chip">Databricks</span></div>
-      </div>
-      <div class="skillrow">
-        <h4>Development &amp; DevOps</h4>
-        <div><span class="chip">CI/CD</span><span class="chip">SDLC</span><span class="chip">ALM</span><span class="chip">QA</span><span class="chip">Agile</span><span class="chip">Scrum</span></div>
       </div>
       <div class="skillrow">
         <h4>BI, analytics &amp; automation</h4>
@@ -771,8 +769,8 @@ nav.main .navlink-btn:hover{color:var(--ink);}
         <div><span class="chip">Exchange</span><span class="chip">Microsoft 365</span><span class="chip">Entra ID</span><span class="chip">Plesk</span><span class="chip">Surgemail</span></div>
       </div>
       <div class="skillrow">
-        <h4>Scripting</h4>
-        <div><span class="chip">PowerShell</span><span class="chip">Bash</span><span class="chip">Batch</span></div>
+        <h4>Automation &amp; DevOps</h4>
+        <div><span class="chip">PowerShell</span><span class="chip">Bash</span><span class="chip">Batch</span><span class="chip">CI/CD</span><span class="chip">Terraform</span></div>
       </div>
       <div class="skillrow">
         <h4>Datacenter &amp; disaster recovery</h4>
@@ -915,16 +913,17 @@ nav.main .navlink-btn:hover{color:var(--ink);}
     for(var i=0;i<proofs.length;i++){ if(!live[proofs[i].getAttribute('data-lab')]){proofs[i].hidden=true;} }
 
     box.textContent='';
+    /* One line per lab. The descriptions and the measured findings live on the
+       focus cards near the top; repeating them here as seventeen full cards made
+       this the longest section on the page for information already given. */
     labs.forEach(function(r){
       var a=el('a','repo'); a.href=r.html_url; a.target='_blank'; a.rel='noopener';
+      if(r.description){a.title=r.description;}
       a.appendChild(el('span','repo-name',r.name));
-      a.appendChild(el('p',null,r.description||'Write-up in progress.'));
-      var topics=r.topics.filter(function(t){return t!==TOPIC;}).slice(0,4);
-      if(topics.length){var tw=el('div','repo-topics'); topics.forEach(function(t){tw.appendChild(el('span','chip',t));}); a.appendChild(tw);}
-      var foot=el('div','repo-foot');
+      var foot=el('span','repo-foot');
       if(r.language){var l=el('span','lang'); var dot=el('i'); dot.style.background=LANG[r.language]||'var(--accent)'; l.appendChild(dot); l.appendChild(document.createTextNode(r.language)); foot.appendChild(l);}
-      foot.appendChild(el('span',null,'Updated '+month(r.pushed_at)));
-      if(r.stargazers_count>0){foot.appendChild(el('span',null,'★ '+r.stargazers_count));}
+      foot.appendChild(el('span',null,month(r.pushed_at)));
+      if(r.stargazers_count>0){foot.appendChild(el('span',null,'\u2605 '+r.stargazers_count));}
       a.appendChild(foot);
       box.appendChild(a);
     });
@@ -1147,6 +1146,19 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   var panel    = document.getElementById('ask-panel');
   var closeBtn = document.getElementById('ask-close');
   var returnTo = null;
+
+  /* Phones only (the CSS for .is-tucked lives in the 640px block): keep the
+     pill off the first screen, where it covered the location chips. */
+  (function(){
+    var narrow = window.matchMedia ? window.matchMedia('(max-width:640px)') : null;
+    function tuck(){ fab.classList.toggle('is-tucked', !!(narrow && narrow.matches) && window.scrollY < window.innerHeight * 0.6); }
+    tuck();
+    window.addEventListener('scroll', tuck, {passive:true});
+    window.addEventListener('resize', tuck);
+    /* Also when the width itself crosses the breakpoint -- a rotation, or a
+       window dragged narrow -- which fires neither of the above reliably. */
+    if(narrow && narrow.addEventListener){ narrow.addEventListener('change', tuck); }
+  })();
 
   function openAsk(trigger) {
     if (!panel.hidden) { input.focus(); return; }
