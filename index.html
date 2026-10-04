@@ -169,6 +169,18 @@ section+section{border-top:1px solid var(--rule);}
 .job li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--rule-2);}
 .job li.win{color:var(--ink);font-weight:500;}
 .job li.win::before{background:var(--accent);}
+/* Earlier roles: one line each, the full entry a click away. A <details>
+   element rather than removed text, so every bullet is still in the page for
+   anyone who expands it or searches it. */
+.earlier-head{padding-left:var(--s4);margin:0 0 var(--s3);font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);}
+.job.earlier{padding-bottom:var(--s3);}
+.job.earlier summary{cursor:pointer;list-style:none;border-radius:var(--r-sm);}
+.job.earlier summary::-webkit-details-marker{display:none;}
+.job.earlier summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px;}
+.job.earlier h3{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.25rem var(--s3);font-size:1rem;}
+.job.earlier .when::after{content:"";display:inline-block;width:.42em;height:.42em;margin-left:.7em;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);position:relative;top:-.18em;transition:transform .16s ease;}
+.job.earlier[open] .when::after{transform:rotate(-135deg);top:.08em;}
+.job.earlier summary:hover h3>span:first-child{text-decoration:underline;text-decoration-color:var(--rule-2);text-underline-offset:.2em;}
 
 /* ================= LABS ================= */
 .gh{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);box-shadow:var(--shadow-1);}
@@ -574,12 +586,10 @@ nav.main .navlink-btn:hover{color:var(--ink);}
         </ul>
       </div>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>Senior Network Administrator — <span class="org">Merchants Foodservice</span></h3>
-          <span class="when">Sep 2016 — Aug 2017</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <p class="earlier-head">Earlier roles, 2007 to 2017 &middot; select one to expand</p>
+
+      <details class="job earlier">
+        <summary><h3><span>Senior Network Administrator — <span class="org">Merchants Foodservice</span></span><span class="when">Hattiesburg, MS &middot; Sep 2016 — Aug 2017</span></h3></summary>
         <ul>
           <li>Managed cloud and physical VMware infrastructure, storage networks, and Windows servers supporting the full company enterprise.</li>
           <li>Maintained network infrastructure across switches, routers, firewalls, VoIP, web content filtering, multiple internet circuits, MPLS WAN links, and datacenter colocation space.</li>
@@ -587,27 +597,19 @@ nav.main .navlink-btn:hover{color:var(--ink);}
           <li>Installed and configured CentOS 7 servers and open-source tooling, including Nagios Core, MediaWiki, and WordPress.</li>
           <li>Decommissioned legacy systems — ManageEngine OpsManager, SharePoint, and GS1 Imaging — as part of infrastructure consolidation.</li>
         </ul>
-      </div>
+      </details>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>System Administrator I — <span class="org">C Spire</span></h3>
-          <span class="when">Oct 2014 — Sep 2016</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <details class="job earlier">
+        <summary><h3><span>System Administrator I — <span class="org">C Spire</span></span><span class="when">Hattiesburg, MS &middot; Oct 2014 — Sep 2016</span></h3></summary>
         <ul>
           <li>Migrated MegaGate systems — file shares, backups, workstations, applications, and servers — into the C Spire enterprise following acquisition, and decommissioned the legacy systems left behind.</li>
           <li>Managed multi-site VMware vCenter and ESX infrastructure, and administered Exchange, Active Directory, Nagios Core, KACE, and Edgewave iPrism.</li>
           <li>Maintained MegaGate datacenter facility operations, including vendor maintenance scheduling, generator load testing, cabling, and colocation customer support.</li>
         </ul>
-      </div>
+      </details>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>Systems Administrator — <span class="org">MegaGate Broadband</span></h3>
-          <span class="when">Aug 2012 — Oct 2014</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <details class="job earlier">
+        <summary><h3><span>Systems Administrator — <span class="org">MegaGate Broadband</span></span><span class="when">Hattiesburg, MS &middot; Aug 2012 — Oct 2014</span></h3></summary>
         <ul>
           <li class="win">Managed web and email hosting platforms at a peak scale of roughly 300 hosted domains, 150 websites, and 6,000 mailboxes across Plesk, Surgemail, and Edgewave spam filtering.</li>
           <li>Virtualized every last physical server on the network.</li>
@@ -615,46 +617,34 @@ nav.main .navlink-btn:hover{color:var(--ink);}
           <li>Managed corporate firewall VPN access over RADIUS, the server public network firewall, and the full backup estate — VM, file-level, and telecom equipment backups, offsite replication, and DR planning.</li>
           <li>Maintained datacenter facility systems including diesel and propane generators, environmental monitoring, and equipment racking and cabling.</li>
         </ul>
-      </div>
+      </details>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>Network Support Specialist — <span class="org">MegaGate Broadband</span></h3>
-          <span class="when">Aug 2010 — Aug 2012</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <details class="job earlier">
+        <summary><h3><span>Network Support Specialist — <span class="org">MegaGate Broadband</span></span><span class="when">Hattiesburg, MS &middot; Aug 2010 — Aug 2012</span></h3></summary>
         <ul>
           <li>Delivered Tier 2 technical support for network engineering and systems administration teams across Metro Ethernet, T1, DSL, VoIP, and web and email hosting products.</li>
           <li>Managed ITaaS client services including turnkey server deployments, hardware and software support, and LAN, WAN, and internet troubleshooting.</li>
           <li class="win">Promoted to Systems Administrator, August 2012.</li>
         </ul>
-      </div>
+      </details>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>IT Support Technician — <span class="org">Pine Belt Mental Healthcare Resources</span></h3>
-          <span class="when">Aug 2009 — Aug 2010</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <details class="job earlier">
+        <summary><h3><span>IT Support Technician — <span class="org">Pine Belt Mental Healthcare Resources</span></span><span class="when">Hattiesburg, MS &middot; Aug 2009 — Aug 2010</span></h3></summary>
         <ul>
           <li>Migrated all production systems and equipment to the corporate office datacenter.</li>
           <li>Maintained Exchange and Plesk email servers and Active Directory for agency operations.</li>
         </ul>
-      </div>
+      </details>
 
-      <div class="job">
-        <div class="jtop">
-          <h3>Network Technician — <span class="org">Service Management Group</span></h3>
-          <span class="when">Jan 2007 — Jan 2009</span>
-        </div>
-        <p class="where">Hattiesburg, MS</p>
+      <details class="job earlier">
+        <summary><h3><span>Network Technician — <span class="org">Service Management Group</span></span><span class="when">Hattiesburg, MS &middot; Jan 2007 — Jan 2009</span></h3></summary>
         <ul>
           <li>Managed server and network infrastructure, workstations, and datacenter colocation space.</li>
           <li>Automated manual server processes using VBScript and batch scripting.</li>
           <li>Contributed to a development team building a SQL-database-backed web application for archiving user-uploaded video content.</li>
           <li>Administered SQL Server and Active Directory, and made .NET and ASP code changes to homegrown company applications.</li>
         </ul>
-      </div>
+      </details>
 
     </div>
   </div>
