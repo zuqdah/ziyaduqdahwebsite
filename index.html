@@ -103,8 +103,8 @@ nav.main a.navlink:hover{color:var(--ink);}
 .locline span{font-size:.8rem;font-weight:500;color:var(--ink-2);background:var(--surface);border:1px solid var(--rule);border-radius:999px;padding:.3rem .8rem;box-shadow:var(--shadow-1);}
 .cta{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s4);}
 
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s2);margin-top:var(--s5);}
-@media (max-width:860px){.stats{grid-template-columns:repeat(2,1fr);}}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s2);margin-top:var(--s5);}
+@media (max-width:700px){.stats{grid-template-columns:1fr;}}
 .stat{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:var(--s3);box-shadow:var(--shadow-1);}
 .stat b{display:block;font-size:1.9rem;font-weight:800;letter-spacing:-.035em;color:var(--ink);line-height:1;}
 .stat small{display:block;margin-top:.6rem;font-size:.825rem;color:var(--ink-3);line-height:1.5;}
@@ -335,7 +335,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
   <div class="wrap">
     <h1>Ziyad Uqdah</h1>
     <p class="role">Senior Systems Engineer | Cloud, Data Platforms &amp; Analytics | DevOps, Migrations &amp; Integrations</p>
-    <p class="lede">Nineteen-plus years across systems administration, infrastructure engineering, and cloud architecture. I work on the parts of a migration that carry real risk: <strong>estate discovery, wave planning, cutover, and recovery that has been tested rather than assumed.</strong> Datacenter transitions for production SaaS, SQL Server platform modernization, and DR runbooks written against contractual SLA, RTO, and RPO targets.</p>
+    <p class="lede">Nineteen-plus years across systems administration, infrastructure engineering, and cloud architecture. For the last four I have been the escalation point for Microsoft Premier Support customers — inside other organisations' Azure, SQL Server, and hybrid estates at the moment they fail — and the labs on this page are where I keep the build work current, each one measured against the live platform rather than described. Before that, the work itself: datacenter transitions for production SaaS, SQL Server platform modernization, and DR runbooks written against contractual SLA, RTO, and RPO targets. I work on the parts of a migration that carry real risk: <strong>estate discovery, wave planning, cutover, and recovery that has been tested rather than assumed.</strong></p>
     <div class="locline">
       <span>New Orleans, LA</span>
       <span>Open to remote &amp; hybrid</span>
@@ -349,9 +349,12 @@ nav.main .navlink-btn:hover{color:var(--ink);}
 
     <div class="stats">
       <div class="stat"><b>19+</b><small>Years across systems, infrastructure, and cloud engineering</small></div>
-      <div class="stat"><b>6,000</b><small>Mailboxes, 300 domains, and 150 websites at peak hosting scale</small></div>
+      <!-- The number is filled from the GitHub feed below, never typed here: the
+           page states no lab count anywhere, which is how the count has stayed
+           right through every publish. If the API is unreachable this reads
+           "Labs" rather than a wrong number. -->
+      <div class="stat"><b id="stat-labs">Labs</b><small>Published labs, each measured against the live platform it is about</small></div>
       <div class="stat"><b>SME</b><small>On the SQL team for a production SaaS datacenter migration</small></div>
-      <div class="stat"><b>2&times;</b><small>Peer-nominated engineering awards across two organizations</small></div>
     </div>
   </div>
 </div>
@@ -505,11 +508,9 @@ nav.main .navlink-btn:hover{color:var(--ink);}
         <p class="where">St. Louis, MO · Remote</p>
         <ul>
           <li>Serve as a primary escalation point for expert-level Microsoft technology tickets, resolving advanced issues across cloud and on-premises environments.</li>
+          <li>Sit on the hiring panel for the Data Platforms &amp; Analytics and BST teams, and author the technical interview questions used across the hiring process.</li>
           <li>Mentor and cross-train Associate and Premier Support Engineers through shadowing, knowledge-sharing, and structured onboarding, building a team resilient to absence in critical processes.</li>
-          <li>Author and maintain Knowledge Base articles that reduce resolution time for recurring escalations across the support team.</li>
-          <li>Lead process adherence and service delivery best practices for the team's support pod, monitoring performance metrics to sustain high client satisfaction.</li>
-          <li>Review and interview candidates for the Data Platforms &amp; Analytics and BST teams, and author the technical interview questions used across the hiring process.</li>
-          <li>Support QA process improvements for automated ticket escalation workflows.</li>
+          <li>Author and maintain Knowledge Base articles that reduce resolution time for recurring escalations, and lead process adherence and service-delivery practice for the pod — including QA improvements to automated escalation workflows.</li>
         </ul>
       </div>
 
@@ -909,6 +910,11 @@ nav.main .navlink-btn:hover{color:var(--ink);}
              typeof r.html_url==='string' && r.html_url.indexOf('https://github.com/')===0;
     }).sort(function(a,b){return new Date(b.pushed_at)-new Date(a.pushed_at);});
     if(!labs.length){return;}
+
+    /* The hero tile shows the same number the catalogue derives, and nothing
+       else on the page states it. Left as the word "Labs" until this runs. */
+    var tile=document.getElementById('stat-labs');
+    if(tile){tile.textContent=String(labs.length);}
 
     /* The focus cards name their labs statically. Once the live list is known,
        drop any card link whose repository is no longer a published lab, so an
