@@ -19,8 +19,9 @@
  * not run reports nothing, and nothing looks exactly like clean.
  */
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
-import { execFileSync, spawnSync } from 'child_process';
+import { execFileSync, execSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,48 @@ function numberWord(n) {
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
 const missingFrom = (a, b) => a.filter((x) => !b.includes(x));
 
+// ------------------------------------------------------------ money and seats
+// Added 2026-10-05, after a lab that documented itself as costing nothing was
+// found to have billed 5.81 USD: seven Azure DevOps service principals kept
+// Basic licences for ten days behind a teardown that reported itself verified.
+// Nothing looked at the bill, at the seat count, or at a nightly cleanup job
+// that had been red every night since the lab was published.
+const LAB_SUBSCRIPTION = 'Ziyad Uqdah';        // matched by exact name; no other subscription is ever queried
+const ADO_ORG = 'zuqdah-labs';
+const ADO_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
+const MONTHLY_CEILING_USD = 10;                // Ziyad's standing limit for the whole lab programme
+const IDLE_DAILY_USD = 0.10;                   // between runs the labs cost a fraction of a cent a day
+
+// Runs the Azure CLI and parses its JSON. Returns { error } rather than throwing:
+// a CLI that is missing or signed out means "could not check", never "fine".
+function az(args) {
+  const quote = (a) => {
+    if (/"/.test(a)) throw new Error('refusing to pass an argument containing a double quote to the shell');
+    return '"' + a + '"';
+  };
+  try {
+    const out = execSync('az ' + args.map(quote).join(' ') + ' -o json', {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26, timeout: 120000,
+    });
+    return { body: out.trim() ? JSON.parse(out) : null };
+  } catch (e) {
+    const text = String((e && (e.stderr || e.message)) || e).split('\n').map((l) => l.trim()).filter(Boolean);
+    return { error: (text.find((l) => /ERROR|not recognized|not found|az login/i.test(l)) || text[0] || 'the Azure CLI failed').slice(0, 200) };
+  }
+}
+
+// Pure judgements, so they can be shown both a passing and a failing case below.
+function judgeSeats(assigned, included) {
+  const paid = Math.max(0, Number(assigned) - Number(included));
+  return { paid, ok: paid === 0, monthly: paid * 6 };
+}
+function judgeSpend(total30, lastThreeDays) {
+  return {
+    underCeiling: Number(total30) <= MONTHLY_CEILING_USD,
+    idle: Number(lastThreeDays) <= IDLE_DAILY_USD * 3,
+  };
+}
+
 // ------------------------------------------------------------------- sources
 const brief = read(path.join(SITE, 'capability-brief.md'));
 const html = read(path.join(SITE, 'index.html'));
@@ -124,6 +167,16 @@ for (const [name, re, mustMatch, mustNot] of [
 }
 check(numberWord(17) === 'seventeen' && numberWord(21) === 'twenty-one' && numberWord(9) === 'nine',
   'numbers are spelled the way the brief heading spells them', numberWord(17) + ', ' + numberWord(21));
+// The numbers behind these four cases are the real ones: eight seats against five
+// was the leak, and 1.74 USD is three days of it.
+check(judgeSeats(8, 5).ok === false && judgeSeats(8, 5).paid === 3 && judgeSeats(8, 5).monthly === 18,
+  'the seat check catches eight Basic licences against five free', JSON.stringify(judgeSeats(8, 5)));
+check(judgeSeats(2, 5).ok === true && judgeSeats(5, 5).ok === true,
+  'the seat check passes two of five, and exactly five of five');
+check(judgeSpend(6.61, 1.74).idle === false && judgeSpend(18, 1.74).underCeiling === false,
+  'the spend check catches a steady daily charge, and a month over the ceiling', JSON.stringify(judgeSpend(6.61, 1.74)));
+check(judgeSpend(0.8, 0.0006).idle === true && judgeSpend(0.8, 0.0006).underCeiling === true,
+  'the spend check passes an idle month');
 
 // ============================================================ 1. local suites
 start('Local test suites');
@@ -262,6 +315,124 @@ if (liveLabs) {
   const cloned = repoDirs.map((r) => path.basename(r));
   const notCloned = liveLabs.map((r) => r.name).filter((n) => !cloned.includes(n));
   check(notCloned.length === 0, 'every published lab has a local clone that was checked', notCloned.join(', '));
+}
+
+// ============================================ 6. scheduled jobs nobody reads
+// A lab's nightly cleanup failed for ten consecutive nights before anyone
+// looked. A scheduled job that is red is a safety net nobody is holding, and
+// GitHub does not tell you about it unless you go and see.
+start('Workflows: nothing is quietly failing');
+{
+  const failing = [];
+  const unread = [];
+  let inspected = 0;
+  for (const repo of repoDirs) {
+    const name = path.basename(repo);
+    const remote = git(repo, 'remote', 'get-url', 'origin') || '';
+    const slug = (remote.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/) || [])[1];
+    if (!slug) { unread.push(name + ' (no GitHub remote)'); continue; }
+    const runs = await get('https://api.github.com/repos/' + slug + '/actions/runs?per_page=30', true);
+    if (runs.error || !runs.body || !Array.isArray(runs.body.workflow_runs)) { unread.push(name + ' (' + (runs.error || 'unexpected response') + ')'); continue; }
+    inspected++;
+    // The latest COMPLETED run of each workflow is the one that says whether it works now.
+    const latest = new Map();
+    for (const run of runs.body.workflow_runs) {
+      // A workflow whose file has since been deleted keeps its last run forever.
+      // The clone was checked against its remote above, so the file is the test.
+      if (!run.path || !fs.existsSync(path.join(repo, run.path.split('@')[0]))) continue;
+      if (run.status === 'completed' && !latest.has(run.name)) latest.set(run.name, run);
+    }
+    for (const [workflow, run] of latest) {
+      if (run.conclusion === 'failure' || run.conclusion === 'timed_out' || run.conclusion === 'startup_failure') {
+        failing.push(name + ' / ' + workflow + ' (' + run.conclusion + ', ' + String(run.created_at).slice(0, 10) + ', ' + run.event + ')');
+      }
+    }
+  }
+  if (unread.length) unknown('read the workflow history of every repository', unread.join('; '));
+  else pass('read the workflow history of every repository (' + inspected + ')');
+  check(failing.length === 0, 'the most recent run of every workflow succeeded', failing.join('; '));
+}
+
+// ===================================================== 7. spend and licences
+start('Spend and licences');
+{
+  // --- Azure DevOps seats: the organization's own accounting is what is billed.
+  const summary = az(['rest', '--method', 'get', '--resource', ADO_RESOURCE,
+    '--url', 'https://vsaex.dev.azure.com/' + ADO_ORG + '/_apis/userentitlementsummary?api-version=7.1-preview.1']);
+  const basic = summary.body && Array.isArray(summary.body.licenses)
+    ? summary.body.licenses.find((l) => l.licenseName === 'Basic')
+    : null;
+  if (summary.error || !basic) {
+    unknown('read the Azure DevOps licence count', summary.error || 'no Basic licence in the summary');
+  } else {
+    const seats = judgeSeats(basic.assigned, basic.includedQuantity);
+    check(seats.ok, 'no Azure DevOps seat is being paid for (' + basic.assigned + ' assigned, ' + basic.includedQuantity + ' free)',
+      seats.paid + ' paid seat(s), about ' + seats.monthly + ' USD a month, billed by the day with no resource group to find it under');
+  }
+
+  const members = az(['rest', '--method', 'get', '--resource', ADO_RESOURCE,
+    '--url', 'https://vsaex.dev.azure.com/' + ADO_ORG + '/_apis/memberentitlements?api-version=7.1-preview.2']);
+  if (members.error || !members.body || !Array.isArray(members.body.items)) {
+    unknown('listed who holds an Azure DevOps licence', members.error || 'unexpected response');
+  } else if (members.body.items.length === 0) {
+    // Whoever is running this is a licensed member, so an empty list is a failed read.
+    unknown('listed who holds an Azure DevOps licence', 'the list came back empty, which cannot be true');
+  } else {
+    const leftovers = members.body.items
+      .filter((m) => m.member && m.member.subjectKind === 'servicePrincipal' && /^guard-drill-/.test(m.member.displayName || ''))
+      .map((m) => m.member.displayName);
+    check(leftovers.length === 0, 'no drill identity is still holding a licence', leftovers.join(', '));
+  }
+
+  // --- Spend. The subscription is found by exact name and no other is queried.
+  const subs = az(['account', 'list', '--query', "[?name=='" + LAB_SUBSCRIPTION + "'].id"]);
+  const subId = subs.body && subs.body.length === 1 ? subs.body[0] : null;
+  if (subs.error || !subId) {
+    unknown('found the lab subscription', subs.error || 'expected exactly one subscription named "' + LAB_SUBSCRIPTION + '"');
+  } else {
+    const day = (offset) => new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+    const bodyFile = path.join(os.tmpdir(), 'drift-cost-query-' + process.pid + '.json');
+    fs.writeFileSync(bodyFile, JSON.stringify({
+      type: 'ActualCost',
+      timeframe: 'Custom',
+      timePeriod: { from: day(30) + 'T00:00:00Z', to: day(0) + 'T23:59:59Z' },
+      dataset: {
+        granularity: 'Daily',
+        aggregation: { totalCost: { name: 'Cost', function: 'Sum' } },
+        grouping: [{ type: 'Dimension', name: 'ServiceName' }],
+      },
+    }));
+    const cost = az(['rest', '--method', 'post',
+      '--url', 'https://management.azure.com/subscriptions/' + subId + '/providers/Microsoft.CostManagement/query?api-version=2023-11-01',
+      '--body', '@' + bodyFile.replace(/\\/g, '/')]);
+    try { fs.unlinkSync(bodyFile); } catch { /* a leftover temp file is not worth failing on */ }
+
+    const props = cost.body && cost.body.properties;
+    if (cost.error || !props || !Array.isArray(props.rows)) {
+      unknown('read the last thirty days of spend', cost.error || 'unexpected response');
+    } else {
+      const cols = props.columns.map((c) => c.name);
+      const ci = cols.indexOf('Cost');
+      const di = cols.indexOf('UsageDate');
+      const si = cols.indexOf('ServiceName');
+      const recent = [1, 2, 3].map((n) => day(n).replace(/-/g, ''));   // the three most recent COMPLETE days
+      let total = 0;
+      let lastThree = 0;
+      const byService = {};
+      for (const row of props.rows) {
+        total += row[ci];
+        byService[row[si]] = (byService[row[si]] || 0) + row[ci];
+        if (recent.includes(String(row[di]))) lastThree += row[ci];
+      }
+      const top = Object.entries(byService).sort((a, b) => b[1] - a[1]).slice(0, 3)
+        .map(([k, v]) => k + ' ' + v.toFixed(2)).join(', ');
+      const verdict = judgeSpend(total, lastThree);
+      check(verdict.underCeiling, 'the last thirty days cost ' + total.toFixed(2) + ' USD, within the ' + MONTHLY_CEILING_USD + ' USD ceiling',
+        'largest: ' + top);
+      check(verdict.idle, 'nothing is billing day after day (' + lastThree.toFixed(2) + ' USD over the last three complete days)',
+        'an idle lab estate costs a fraction of a cent a day; largest over thirty days: ' + top);
+    }
+  }
 }
 
 // --------------------------------------------------------------------- output
