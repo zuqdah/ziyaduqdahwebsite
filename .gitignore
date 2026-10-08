@@ -13,3 +13,9 @@ private/
 # repository would be read as the current behaviour of an endpoint that changes
 # whenever the brief or the model does.
 dev/eval-report.json
+
+# Local Claude Code skills (brag-slim, from latent-spaces/brag @ 7079945) and
+# the launch videos it writes. Plesk deploys this repo to the web root, so
+# anything committed here is publicly served on ziyaduqdah.com.
+.claude/
+brag-output*/
