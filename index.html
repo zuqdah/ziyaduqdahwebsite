@@ -353,9 +353,9 @@ html.intro-on, html.intro-on body{overflow:hidden;}
   var root=document.documentElement, tall=innerHeight>innerWidth;
   var box=document.createElement('div'); box.className='intro'; box.setAttribute('role','dialog'); box.setAttribute('aria-label','Intro video');
   var v=document.createElement('video');
-  v.src=tall?'/media/intro-1080x1920-v1.mp4':'/media/intro-1920x1080-v1.mp4';
+  v.src=tall?'/media/intro-1080x1920-v2.mp4':'/media/intro-1920x1080-v2.mp4';
   v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.autoplay=true;
-  v.setAttribute('aria-label','A 23-second introduction to this page, with music');
+  v.setAttribute('aria-label','A 25-second introduction to this page, with music');
   var ctl=document.createElement('div'); ctl.className='intro-ctl';
   var snd=document.createElement('button'); snd.type='button'; snd.textContent='Sound on';
   var skip=document.createElement('button'); skip.type='button'; skip.textContent='Skip intro';
