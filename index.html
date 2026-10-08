@@ -317,9 +317,83 @@ nav.main .navlink-btn:hover{color:var(--ink);}
      the class is never added and the pill is simply always there. */
   .ask-fab.is-tucked{opacity:0;visibility:hidden;transform:translateY(8px);pointer-events:none;}
 }
+
+/* ---- intro video ---------------------------------------------------------
+   Played once per browser, over the page, then faded away. It is built by the
+   script at the top of <body> and never exists without JavaScript, so the page
+   underneath is always complete -- the intro covers it, it does not replace it.
+   The background is the video's own first and last colour (the band slate in
+   both themes), so letterboxing and the fade-out read as part of the film. */
+.intro{position:fixed;inset:0;z-index:100;background:#1F2937;display:flex;align-items:center;justify-content:center;
+  opacity:1;transition:opacity .6s ease;}
+.intro.is-leaving{opacity:0;pointer-events:none;}
+.intro video{width:100%;height:100%;object-fit:contain;display:block;}
+.intro-ctl{position:absolute;right:var(--s2);bottom:var(--s2);display:flex;gap:.6rem;}
+.intro-ctl button{font-family:var(--f);font-size:.875rem;font-weight:600;line-height:1;padding:.72rem 1.1rem;border-radius:999px;cursor:pointer;
+  color:#F3F5F7;background:rgba(17,24,39,.55);border:1px solid rgba(243,245,247,.28);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.intro-ctl button:hover{border-color:#5EEAD4;color:#5EEAD4;}
+.intro-ctl button:focus-visible{outline:2px solid #5EEAD4;outline-offset:2px;}
+html.intro-on, html.intro-on body{overflow:hidden;}
 </style>
 </head>
 <body>
+<script>
+/* Intro video, shown once per browser before the page. Runs first in <body> so
+   the cover is in place before the page paints, rather than flashing the page
+   and then hiding it. It stands down -- and the page simply shows -- when the
+   visitor has seen it, asked for reduced motion, is saving data, or when the
+   video cannot start within a few seconds. A slow network must never mean a
+   recruiter looking at a dark screen. ?intro replays it on demand. */
+(function(){
+  var KEY='zu-intro-v1', force=/[?&]intro\b/.test(location.search);
+  try{ if(!force && localStorage.getItem(KEY)){return;} }catch(e){}
+  if(!force && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){return;}
+  if(!force && navigator.connection && navigator.connection.saveData){return;}
+
+  var root=document.documentElement, tall=innerHeight>innerWidth;
+  var box=document.createElement('div'); box.className='intro'; box.setAttribute('role','dialog'); box.setAttribute('aria-label','Intro video');
+  var v=document.createElement('video');
+  v.src=tall?'/media/intro-1080x1920-v1.mp4':'/media/intro-1920x1080-v1.mp4';
+  v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.autoplay=true;
+  v.setAttribute('aria-label','A 23-second introduction to this page, with music');
+  var ctl=document.createElement('div'); ctl.className='intro-ctl';
+  var snd=document.createElement('button'); snd.type='button'; snd.textContent='Sound on';
+  var skip=document.createElement('button'); skip.type='button'; skip.textContent='Skip intro';
+  ctl.appendChild(snd); ctl.appendChild(skip); box.appendChild(v); box.appendChild(ctl);
+  document.body.appendChild(box); root.classList.add('intro-on');
+
+  var done=false;
+  function finish(){
+    if(done){return;} done=true;
+    try{localStorage.setItem(KEY,'1');}catch(e){}
+    box.classList.add('is-leaving'); root.classList.remove('intro-on');
+    setTimeout(function(){ v.pause(); v.removeAttribute('src'); v.load(); if(box.parentNode){box.parentNode.removeChild(box);} },650);
+  }
+  /* Not marked as seen when it never played: a failure is not a viewing. */
+  function standDown(){ if(done){return;} done=true; root.classList.remove('intro-on'); if(box.parentNode){box.parentNode.removeChild(box);} }
+
+  var started=false;
+  v.addEventListener('playing',function(){ started=true; });
+  v.addEventListener('ended',finish);
+  v.addEventListener('error',standDown);
+  /* The watchdog and the play() call wait until the tab is on screen. A page
+     opened in a background tab -- a middle-click from LinkedIn or a search
+     result -- is not allowed to start media, and timing out there would
+     throw the intro away before the visitor ever looked at the tab. */
+  function go(){
+    if(document.hidden||done){return;}
+    document.removeEventListener('visibilitychange',go);
+    setTimeout(function(){ if(!started){standDown();} },3500);
+    var p=v.play(); if(p&&p.catch){p.catch(standDown);}
+  }
+  if(document.hidden){document.addEventListener('visibilitychange',go);}else{go();}
+
+  skip.addEventListener('click',finish);
+  snd.addEventListener('click',function(){ v.muted=!v.muted; snd.textContent=v.muted?'Sound on':'Sound off'; });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!done){finish();} });
+  setTimeout(function(){ try{skip.focus({preventScroll:true});}catch(e){} },0);
+})();
+</script>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="site">
