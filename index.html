@@ -319,7 +319,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
 }
 
 /* ---- intro video ---------------------------------------------------------
-   Played once per browser, over the page, then faded away. It is built by the
+   Played on every visit, over the page, then faded away. It is built by the
    script at the top of <body> and never exists without JavaScript, so the page
    underneath is always complete -- the intro covers it, it does not replace it.
    The background is the video's own first and last colour (the band slate in
@@ -338,15 +338,16 @@ html.intro-on, html.intro-on body{overflow:hidden;}
 </head>
 <body>
 <script>
-/* Intro video, shown once per browser before the page. Runs first in <body> so
+/* Intro video, shown before the page on every visit. Runs first in <body> so
    the cover is in place before the page paints, rather than flashing the page
    and then hiding it. It stands down -- and the page simply shows -- when the
-   visitor has seen it, asked for reduced motion, is saving data, or when the
-   video cannot start within a few seconds. A slow network must never mean a
-   recruiter looking at a dark screen. ?intro replays it on demand. */
+   visitor has asked for reduced motion, is saving data, or when the video
+   cannot start within a few seconds. A slow network must never mean a
+   recruiter looking at a dark screen. ?intro forces it past those preferences. */
 (function(){
-  var KEY='zu-intro-v1', force=/[?&]intro\b/.test(location.search);
-  try{ if(!force && localStorage.getItem(KEY)){return;} }catch(e){}
+  var force=/[?&]intro\b/.test(location.search);
+  /* The once-per-browser version left this flag behind; nothing reads it now. */
+  try{ localStorage.removeItem('zu-intro-v1'); }catch(e){}
   if(!force && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){return;}
   if(!force && navigator.connection && navigator.connection.saveData){return;}
 
@@ -365,11 +366,9 @@ html.intro-on, html.intro-on body{overflow:hidden;}
   var done=false;
   function finish(){
     if(done){return;} done=true;
-    try{localStorage.setItem(KEY,'1');}catch(e){}
     box.classList.add('is-leaving'); root.classList.remove('intro-on');
     setTimeout(function(){ v.pause(); v.removeAttribute('src'); v.load(); if(box.parentNode){box.parentNode.removeChild(box);} },650);
   }
-  /* Not marked as seen when it never played: a failure is not a viewing. */
   function standDown(){ if(done){return;} done=true; root.classList.remove('intro-on'); if(box.parentNode){box.parentNode.removeChild(box);} }
 
   var started=false;
