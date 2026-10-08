@@ -325,7 +325,7 @@ nav.main .navlink-btn:hover{color:var(--ink);}
    The background is the video's own first and last colour (the band slate in
    both themes), so letterboxing and the fade-out read as part of the film. */
 .intro{position:fixed;inset:0;z-index:100;background:#1F2937;display:flex;align-items:center;justify-content:center;
-  opacity:1;transition:opacity .6s ease;}
+  opacity:1;transition:opacity .6s ease;cursor:pointer;}
 .intro.is-leaving{opacity:0;pointer-events:none;}
 .intro video{width:100%;height:100%;object-fit:contain;display:block;}
 .intro-ctl{position:absolute;right:var(--s2);bottom:var(--s2);display:flex;gap:.6rem;}
@@ -389,6 +389,9 @@ html.intro-on, html.intro-on body{overflow:hidden;}
   if(document.hidden){document.addEventListener('visibilitychange',go);}else{go();}
 
   skip.addEventListener('click',finish);
+  /* A click or tap anywhere on the film skips it too -- except on the
+     buttons, so turning the sound on never throws the intro away. */
+  box.addEventListener('click',function(e){ if(!e.target.closest('.intro-ctl')){finish();} });
   snd.addEventListener('click',function(){ v.muted=!v.muted; snd.textContent=v.muted?'Sound on':'Sound off'; });
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&!done){finish();} });
   setTimeout(function(){ try{skip.focus({preventScroll:true});}catch(e){} },0);
