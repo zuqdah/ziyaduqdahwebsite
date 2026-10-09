@@ -113,19 +113,46 @@ That last one is the load-bearing check. Everything else is a cost control.
 
 ## Changing the model or provider
 
-Two providers are wired into `chat.php`, in the `PROVIDERS` table at the top:
-`groq` (gpt-oss-120b, the default) and `gemini` (gemini-3.8-flash through
-Google's OpenAI-compatible endpoint). Which one answers is decided outside the
-repository, next to the keys: set `ASSISTANT_PROVIDER` in the environment, or
-put the one word in `private/assistant.provider`. Each provider reads its own
-key (`GROQ_API_KEY` / `private/groq.key`, `GEMINI_API_KEY` /
-`private/gemini.key`), so both keys can be in place and the file decides. A
-name that is not in the table is refused with a 503 rather than falling back:
-a typo must not quietly route visitors' questions to a different company.
+Three providers are wired into `chat.php`, in the `PROVIDERS` table at the
+top: `groq` (gpt-oss-120b, the default), `gemini` (gemini-3.8-flash through
+Google's OpenAI-compatible endpoint) and `anthropic` (Claude Haiku 5.5 through
+the Messages API). Which one answers is decided outside the repository, next
+to the keys: set `ASSISTANT_PROVIDER` in the environment, or put the one word
+in `private/assistant.provider`. Each provider reads its own key
+(`private/groq.key`, `private/gemini.key`, `private/anthropic.key`, or the
+matching `*_API_KEY` variable), so every key can be in place and the file
+decides. A name that is not in the table is refused with a 503 rather than
+falling back: a typo must not quietly route visitors' questions to a
+different company.
 
-Adding a provider is a row in that table. The request body is OpenAI-compatible,
-so Together, OpenRouter, Cloudflare Workers AI and most open-weight hosts need
-only a model, an endpoint and a key name.
+Adding a provider is a row in that table. Groq and Gemini speak the OpenAI
+chat-completions shape, so Together, OpenRouter, Cloudflare Workers AI and
+most open-weight hosts need only a model, an endpoint and a key name. The
+Anthropic row speaks the Messages shape -- the brief goes in a separate
+`system` field, the reply comes back as content blocks -- and a row may also
+set its own output ceiling and token ceilings, because the shared ones were
+sized for Groq's tokenizer and Groq's free tier.
+
+**Haiku 5.5 is the one paid option, and it is the one that passed cleanly.**
+Tried on 2026-10-09, locally, the same way as Gemini below: 17/17 on the
+second pass, 14/17 on the first, with no provider errors in either. The three
+that did not pass first time were two replies cut at the 400-token output
+ceiling -- Haiku answers at greater length than gpt-oss for the same question,
+so its row sets 600 -- and one call refused by `chat.php`'s own per-visitor
+limit, because the smoke test before the run had counted. It is also the
+fastest of the three, under two seconds a call. What it costs: Claude counts
+the brief at about 4,900 tokens, a question runs 5,000-5,500 tokens in all,
+and at $0.10 per million in and $0.50 per million out that is about a
+twentieth of a cent each. The two eval runs together cost just over one cent.
+The row's token ceilings (600,000 a day, 12,000 a minute) are a cost cap of
+about six cents a day. It runs on prepaid credit, not a free tier, so the
+assistant stops when the balance does; a spend limit in the Console is the
+backstop.
+
+To switch the live site: put `anthropic.key` beside `groq.key` above
+`httpdocs`, write the word `anthropic` into `private/assistant.provider`,
+and run `dev/eval.mjs --run` against the live URL. Change the file back to
+switch back; nothing in the repository moves.
 
 **Gemini was tried on 2026-10-09 and is not the default, for a reason worth
 keeping.** Over two eval runs from a fresh project, the free tier answered 10

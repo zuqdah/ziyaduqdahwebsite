@@ -11,13 +11,18 @@
  * or from a file ABOVE the document root, which git cannot reach. See
  * README-chat.md for where to put it.
  *
- * Two providers are wired in, both free tiers, both OpenAI-compatible, and
- * which one answers is decided by a file next to the key rather than by an
- * edit here (see README-chat.md). Groq serves open-weight gpt-oss-120b and
- * allows 1,000 requests and 200,000 tokens a day. Google's Gemini API serves
- * gemini-3.8-flash; its free-tier limits are not published and are read from
- * AI Studio for the project, and its terms allow the content to be used to
- * improve Google's products, which Groq's do not.
+ * Three providers are wired in, and which one answers is decided by a file
+ * next to the key rather than by an edit here (see README-chat.md). Groq
+ * serves open-weight gpt-oss-120b on a free tier that allows 1,000 requests
+ * and 200,000 tokens a day. Google's Gemini API serves gemini-3.8-flash on a
+ * free tier whose limits are not published and whose terms allow the content
+ * to be used to improve Google's products. Anthropic serves Claude Haiku 5.5
+ * on prepaid credit, at about a twentieth of a cent per question; it is the
+ * one provider here that is not a free tier, and the one whose answers do not
+ * arrive on a best-effort basis.
+ *
+ * Groq and Gemini speak the OpenAI chat-completions shape; Anthropic speaks
+ * its own Messages shape, and each provider row says which.
  *
  * The token ceiling is the binding constraint, not the request count: the
  * grounding brief is resent on every call, so a long brief and a long reply
@@ -28,6 +33,7 @@ declare(strict_types=1);
 
 const PROVIDERS = [
     'groq' => [
+        'format'           => 'openai',
         'model'            => 'openai/gpt-oss-120b',
         'endpoint'         => 'https://api.groq.com/openai/v1/chat/completions',
         'key_env'          => 'GROQ_API_KEY',
@@ -38,6 +44,7 @@ const PROVIDERS = [
         'reasoning_effort' => 'low',
     ],
     'gemini' => [
+        'format'           => 'openai',
         'model'            => 'gemini-3.8-flash',
         'endpoint'         => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
         'key_env'          => 'GEMINI_API_KEY',
@@ -46,9 +53,31 @@ const PROVIDERS = [
         // 'low' is the least it accepts ('minimal' is rejected by this model).
         'reasoning_effort' => 'low',
     ],
+    'anthropic' => [
+        'format'           => 'anthropic',
+        'model'            => 'claude-haiku-5-5',
+        'endpoint'         => 'https://api.anthropic.com/v1/messages',
+        'key_env'          => 'ANTHROPIC_API_KEY',
+        'key_file'         => 'anthropic.key',
+        // Haiku 5.5 thinks adaptively by default and defaults to medium
+        // effort; 'low' is the right depth for a lookup, and thinking tokens
+        // are billed as output and count against the output ceiling.
+        'reasoning_effort' => 'low',
+        // Its answers run longer than gpt-oss's for the same question -- the
+        // first eval run cut two of seventeen at 400 -- and output is the
+        // cheap part of the bill, so the ceiling is higher here.
+        'max_output_tokens' => 600,
+        // On a free tier the token ceilings below protect the allowance; on
+        // prepaid credit they are a cost cap. Claude counts the brief at about
+        // 4,900 tokens, so the shared 190,000 a day would be 37 answers. These
+        // are roughly 115 answers a day and two a minute, and at Haiku 5.5's
+        // rates the day's ceiling is about six cents.
+        'tokens_per_day'    => 600000,
+        'tokens_per_minute' => 12000,
+    ],
 ];
 const DEFAULT_PROVIDER   = 'groq';
-const MAX_OUTPUT_TOKENS  = 400;   // keeps replies tight; see the truncation log below before raising it
+const MAX_OUTPUT_TOKENS  = 400;   // keeps replies tight; see the truncation log below before raising it. A provider row may raise it.
 const MAX_INPUT_CHARS    = 600;   // a question, not a pasted document
 const MAX_HISTORY_TURNS  = 4;     // enough to follow up, bounded so context cannot grow without limit
 const PER_IP_LIMIT       = 12;    // messages per window, per visitor
@@ -133,6 +162,10 @@ define('PROVIDER', providerName());
 define('MODEL', PROVIDERS[PROVIDER]['model']);
 define('ENDPOINT', PROVIDERS[PROVIDER]['endpoint']);
 define('REASONING_EFFORT', PROVIDERS[PROVIDER]['reasoning_effort']);
+define('FORMAT', PROVIDERS[PROVIDER]['format']);
+define('OUTPUT_TOKENS', PROVIDERS[PROVIDER]['max_output_tokens'] ?? MAX_OUTPUT_TOKENS);
+define('DAY_TOKENS', PROVIDERS[PROVIDER]['tokens_per_day'] ?? TOKENS_PER_DAY);
+define('MINUTE_TOKENS', PROVIDERS[PROVIDER]['tokens_per_minute'] ?? TOKENS_PER_MINUTE);
 
 /* ------------------------------------------------------------------ the key */
 
@@ -261,20 +294,20 @@ $dayKey = 'tok-day-' . gmdate('Y-m-d');
 $minKey = 'tok-min-' . gmdate('Y-m-d-H-i');
 
 $daySpent = bumpWindow($dayKey, 0, 86400);
-if ($daySpent === null || $daySpent + RESERVE_TOKENS > TOKENS_PER_DAY) {
+if ($daySpent === null || $daySpent + RESERVE_TOKENS > DAY_TOKENS) {
     fail(
         429,
         'The assistant has answered as much as it can today. The scenarios and labs on this page cover the same ground, or email ziyad@ziyaduqdah.com.',
-        'daily token ceiling: ' . var_export($daySpent, true) . ' of ' . TOKENS_PER_DAY . ' spent'
+        'daily token ceiling: ' . var_export($daySpent, true) . ' of ' . DAY_TOKENS . ' spent'
     );
 }
 
 $minSpent = bumpWindow($minKey, 0, 60);
-if ($minSpent === null || $minSpent + RESERVE_TOKENS > TOKENS_PER_MINUTE) {
+if ($minSpent === null || $minSpent + RESERVE_TOKENS > MINUTE_TOKENS) {
     fail(
         429,
         'The assistant is already answering someone else. Try again in a moment, or email ziyad@ziyaduqdah.com.',
-        'per-minute token ceiling: ' . var_export($minSpent, true) . ' of ' . TOKENS_PER_MINUTE . ' spent'
+        'per-minute token ceiling: ' . var_export($minSpent, true) . ' of ' . MINUTE_TOKENS . ' spent'
     );
 }
 
@@ -319,18 +352,58 @@ $messages[] = ['role' => 'user', 'content' => $message];
 
 /* ------------------------------------------------------------------ call */
 
-$request = [
-    'model'       => MODEL,
-    'messages'    => $messages,
-    'max_tokens'  => MAX_OUTPUT_TOKENS,
-    // Zero, not 0.2. Every answer here is a lookup in the brief, and there is
-    // no question on this site whose best answer comes from sampling.
-    'temperature' => 0,
-    // Both wired-in models reason before they answer, and those tokens come
-    // out of both the daily allowance and the output ceiling. Grounded lookup
-    // needs very little of it; the level is set per provider above.
-    'reasoning_effort' => REASONING_EFFORT,
-];
+/**
+ * The provider's request body. $messages starts with the brief as a system
+ * message, which is how the OpenAI shape wants it; the Anthropic shape takes
+ * the brief as a separate field and the turns on their own.
+ */
+function buildRequest(array $messages): array
+{
+    if (FORMAT === 'anthropic') {
+        $brief = (string) $messages[0]['content'];
+        $turns = [];
+        foreach (array_slice($messages, 1) as $turn) {
+            // The Messages API wants user and assistant to alternate. Two
+            // user turns in a row -- a visitor who sent twice before the
+            // first answer came -- are joined rather than rejected.
+            $last = count($turns) - 1;
+            if ($last >= 0 && $turns[$last]['role'] === $turn['role']) {
+                $turns[$last]['content'] .= "\n\n" . $turn['content'];
+            } else {
+                $turns[] = ['role' => $turn['role'], 'content' => $turn['content']];
+            }
+        }
+        return [
+            'model'      => MODEL,
+            'max_tokens' => OUTPUT_TOKENS,
+            // The brief is the same bytes on every call, so it is marked as a
+            // cache prefix. Below the model's minimum cacheable size this is a
+            // silent no-op, which is fine: it costs nothing either way.
+            'system'     => [['type' => 'text', 'text' => $brief, 'cache_control' => ['type' => 'ephemeral']]],
+            'messages'   => $turns,
+            // Thinking is left at its default (adaptive); the depth is the
+            // provider's effort setting. No temperature: this model rejects
+            // non-default sampling values, and a grounded lookup at low effort
+            // does not need one.
+            'output_config' => ['effort' => REASONING_EFFORT],
+        ];
+    }
+
+    return [
+        'model'       => MODEL,
+        'messages'    => $messages,
+        'max_tokens'  => OUTPUT_TOKENS,
+        // Zero, not 0.2. Every answer here is a lookup in the brief, and there is
+        // no question on this site whose best answer comes from sampling.
+        'temperature' => 0,
+        // Both OpenAI-shaped models reason before they answer, and those tokens
+        // come out of both the daily allowance and the output ceiling. Grounded
+        // lookup needs very little of it; the level is set per provider above.
+        'reasoning_effort' => REASONING_EFFORT,
+    ];
+}
+
+$request = buildRequest($messages);
 
 /**
  * @return array{status:int,body:string|false,error:string}
@@ -344,10 +417,9 @@ function callProvider(array $request): array
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 30,
         CURLOPT_CONNECTTIMEOUT => 8,
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . apiKey(),
-        ],
+        CURLOPT_HTTPHEADER     => FORMAT === 'anthropic'
+            ? ['Content-Type: application/json', 'x-api-key: ' . apiKey(), 'anthropic-version: 2023-06-01']
+            : ['Content-Type: application/json', 'Authorization: Bearer ' . apiKey()],
     ]);
 
     $body = curl_exec($curl);
@@ -367,7 +439,7 @@ $result = callProvider($request);
 // model-specific parameter and a model swap could make it invalid. A rejected
 // parameter would take the assistant down for every visitor, so a 400 that
 // names it costs one retry instead: degraded, logged, and still answering.
-if ($result['status'] === 400 && is_string($result['body']) && str_contains($result['body'], 'reasoning_effort')) {
+if (FORMAT === 'openai' && $result['status'] === 400 && is_string($result['body']) && str_contains($result['body'], 'reasoning_effort')) {
     error_log('chat.php: provider rejected reasoning_effort, retrying without it: ' . mb_substr($result['body'], 0, 300));
     unset($request['reasoning_effort']);
     $result = callProvider($request);
@@ -390,14 +462,46 @@ if ($status < 200 || $status >= 300) {
 }
 
 $decoded = json_decode((string) $response, true);
-$reply   = trim((string) ($decoded['choices'][0]['message']['content'] ?? ''));
-$finish  = (string) ($decoded['choices'][0]['finish_reason'] ?? '');
 $usage   = is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [];
 
-$promptTokens     = (int) ($usage['prompt_tokens'] ?? 0);
-$completionTokens = (int) ($usage['completion_tokens'] ?? 0);
-$reasoningTokens  = (int) ($usage['completion_tokens_details']['reasoning_tokens'] ?? 0);
-$totalTokens      = (int) ($usage['total_tokens'] ?? 0);
+if (FORMAT === 'anthropic') {
+    // The reply is a list of content blocks. Thinking blocks come first and
+    // carry no text by default; only the text blocks are the answer.
+    $parts = [];
+    foreach (is_array($decoded['content'] ?? null) ? $decoded['content'] : [] as $block) {
+        if (($block['type'] ?? '') === 'text') {
+            $parts[] = (string) ($block['text'] ?? '');
+        }
+    }
+    $reply = trim(implode('', $parts));
+
+    // Reported in the OpenAI vocabulary so the log, the truncation check and
+    // dev/eval.mjs read both providers the same way. 'refusal' is kept as
+    // itself: a safety decline is neither a complete answer nor a cut one.
+    $finish = match ((string) ($decoded['stop_reason'] ?? '')) {
+        'end_turn', 'stop_sequence' => 'stop',
+        'max_tokens'                => 'length',
+        ''                          => '',
+        default                     => (string) $decoded['stop_reason'],
+    };
+
+    // Cached prefix tokens are billed at a fraction of the input rate but they
+    // are still tokens the call consumed, so they count against the ceiling.
+    $promptTokens     = (int) ($usage['input_tokens'] ?? 0)
+        + (int) ($usage['cache_read_input_tokens'] ?? 0)
+        + (int) ($usage['cache_creation_input_tokens'] ?? 0);
+    $completionTokens = (int) ($usage['output_tokens'] ?? 0);
+    $reasoningTokens  = 0; // thinking is inside output_tokens and not reported separately
+    $totalTokens      = $promptTokens + $completionTokens;
+} else {
+    $reply   = trim((string) ($decoded['choices'][0]['message']['content'] ?? ''));
+    $finish  = (string) ($decoded['choices'][0]['finish_reason'] ?? '');
+
+    $promptTokens     = (int) ($usage['prompt_tokens'] ?? 0);
+    $completionTokens = (int) ($usage['completion_tokens'] ?? 0);
+    $reasoningTokens  = (int) ($usage['completion_tokens_details']['reasoning_tokens'] ?? 0);
+    $totalTokens      = (int) ($usage['total_tokens'] ?? 0);
+}
 
 // A call whose cost could not be read is charged the reserve, not nothing. It
 // consumed the provider's allowance either way, and treating an unmeasured cost
@@ -416,9 +520,9 @@ error_log(sprintf(
     $totalTokens > 0 ? '' : ' (UNREAD, charged ' . RESERVE_TOKENS . ')',
     $finish === '' ? 'none' : $finish,
     $dayNow === null ? '?' : (string) $dayNow,
-    TOKENS_PER_DAY,
+    DAY_TOKENS,
     $minNow === null ? '?' : (string) $minNow,
-    TOKENS_PER_MINUTE
+    MINUTE_TOKENS
 ));
 
 // Truncation is invisible in the reply itself -- a sentence cut at the ceiling
@@ -426,7 +530,7 @@ error_log(sprintf(
 // ceiling is too low rather than the model being terse, and because reasoning
 // tokens share that ceiling it is the number to check before raising it.
 if ($finish === 'length') {
-    error_log('chat.php: reply TRUNCATED at max_tokens=' . MAX_OUTPUT_TOKENS
+    error_log('chat.php: reply TRUNCATED at max_tokens=' . OUTPUT_TOKENS
         . ' (completion=' . $completionTokens . ', of which reasoning=' . $reasoningTokens . ')');
 }
 
