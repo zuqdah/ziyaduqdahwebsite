@@ -113,9 +113,37 @@ That last one is the load-bearing check. Everything else is a cost control.
 
 ## Changing the model or provider
 
-`MODEL` and `ENDPOINT` at the top of `chat.php`. The request body is
-OpenAI-compatible, so Together, OpenRouter, Cloudflare Workers AI and most
-open-weight hosts work by changing those two constants and the key.
+Two providers are wired into `chat.php`, in the `PROVIDERS` table at the top:
+`groq` (gpt-oss-120b, the default) and `gemini` (gemini-3.8-flash through
+Google's OpenAI-compatible endpoint). Which one answers is decided outside the
+repository, next to the keys: set `ASSISTANT_PROVIDER` in the environment, or
+put the one word in `private/assistant.provider`. Each provider reads its own
+key (`GROQ_API_KEY` / `private/groq.key`, `GEMINI_API_KEY` /
+`private/gemini.key`), so both keys can be in place and the file decides. A
+name that is not in the table is refused with a 503 rather than falling back:
+a typo must not quietly route visitors' questions to a different company.
+
+Adding a provider is a row in that table. The request body is OpenAI-compatible,
+so Together, OpenRouter, Cloudflare Workers AI and most open-weight hosts need
+only a model, an endpoint and a key name.
+
+**Gemini was tried on 2026-10-09 and is not the default, for a reason worth
+keeping.** Over two eval runs from a fresh project, the free tier answered 10
+of 27 calls; the rest were `503 "This model is currently experiencing high
+demand"` (eleven), `429` (four), and a `403 "API has not been used in this
+project"` that kept returning for twenty minutes after the API was enabled.
+Every answer it did give passed its case, and it used no markdown, so the
+model is fine; the free tier is not something a visitor can be handed. Two
+more differences if it is ever promoted: Google counts the same brief at
+about 3,400 prompt tokens where Groq counts 2,300, so the token ceilings in
+`chat.php` must be re-based from the limits AI Studio shows for the project
+(Google does not publish them); and the free tier's terms allow the content to
+be used to improve Google's products, which Groq's do not. The local run that
+found all this is reproducible: serve `chat.php` with
+`php -S` from a container, mount a `private/` directory one level above it,
+set `ASSISTANT_PROVIDER`, and point `dev/eval.mjs --url` at it, at the
+production pace -- faster trips `chat.php`'s own per-visitor limit, since
+every eval call comes from one address.
 
 Worth knowing: free tiers move. Groq removed Llama 3.3 70B from its free plan
 in August 2026, and Cerebras replaced its free tier with a trial that needs a

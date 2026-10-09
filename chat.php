@@ -11,8 +11,14 @@
  * or from a file ABOVE the document root, which git cannot reach. See
  * README-chat.md for where to put it.
  *
- * The model is open-weight (gpt-oss-120b) served by Groq's free tier, chosen
- * because it needs no card and allows 1,000 requests and 200,000 tokens a day.
+ * Two providers are wired in, both free tiers, both OpenAI-compatible, and
+ * which one answers is decided by a file next to the key rather than by an
+ * edit here (see README-chat.md). Groq serves open-weight gpt-oss-120b and
+ * allows 1,000 requests and 200,000 tokens a day. Google's Gemini API serves
+ * gemini-3.8-flash; its free-tier limits are not published and are read from
+ * AI Studio for the project, and its terms allow the content to be used to
+ * improve Google's products, which Groq's do not.
+ *
  * The token ceiling is the binding constraint, not the request count: the
  * grounding brief is resent on every call, so a long brief and a long reply
  * together decide how many people the site can actually answer.
@@ -20,8 +26,28 @@
 
 declare(strict_types=1);
 
-const MODEL              = 'openai/gpt-oss-120b';
-const ENDPOINT           = 'https://api.groq.com/openai/v1/chat/completions';
+const PROVIDERS = [
+    'groq' => [
+        'model'            => 'openai/gpt-oss-120b',
+        'endpoint'         => 'https://api.groq.com/openai/v1/chat/completions',
+        'key_env'          => 'GROQ_API_KEY',
+        'key_file'         => 'groq.key',
+        // gpt-oss reasons before it answers, and those tokens come out of both
+        // the daily allowance and the output ceiling. Grounded lookup needs very
+        // little of it and the allowance is the binding constraint.
+        'reasoning_effort' => 'low',
+    ],
+    'gemini' => [
+        'model'            => 'gemini-3.8-flash',
+        'endpoint'         => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+        'key_env'          => 'GEMINI_API_KEY',
+        'key_file'         => 'gemini.key',
+        // Gemini 3.8 Flash thinks before it answers and cannot be told not to;
+        // 'low' is the least it accepts ('minimal' is rejected by this model).
+        'reasoning_effort' => 'low',
+    ],
+];
+const DEFAULT_PROVIDER   = 'groq';
 const MAX_OUTPUT_TOKENS  = 400;   // keeps replies tight; see the truncation log below before raising it
 const MAX_INPUT_CHARS    = 600;   // a question, not a pasted document
 const MAX_HISTORY_TURNS  = 4;     // enough to follow up, bounded so context cannot grow without limit
@@ -46,7 +72,6 @@ const DAILY_LIMIT        = 300;   // site-wide requests, under the provider's 1,
 const TOKENS_PER_DAY     = 190000;  // under the provider's 200,000
 const TOKENS_PER_MINUTE  = 7000;    // under the provider's 8,000
 const RESERVE_TOKENS     = 6000;    // what one worst-case call costs: brief + full history + output
-const REASONING_EFFORT   = 'low';   // gpt-oss reasons before answering, and it is billed for it
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -68,11 +93,54 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     fail(405, 'Send a POST request.');
 }
 
+/* ------------------------------------------------------- the provider */
+
+/** The directory above the document root: served by nothing, cloned by nothing. */
+function privateDir(): string
+{
+    $docRoot = (string) ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__);
+    return dirname($docRoot) . '/private';
+}
+
+/**
+ * Which provider answers. ASSISTANT_PROVIDER in the environment, else the
+ * one-word file private/assistant.provider next to the keys, else the default.
+ * A name that is not wired in is a configuration error, not a fallback: a
+ * typo must not silently route a visitor's question to a different provider.
+ */
+function providerName(): string
+{
+    $fromEnv = getenv('ASSISTANT_PROVIDER');
+    $name = is_string($fromEnv) && trim($fromEnv) !== '' ? trim($fromEnv) : '';
+
+    if ($name === '') {
+        $file = privateDir() . '/assistant.provider';
+        if (is_readable($file)) {
+            $name = trim((string) file_get_contents($file));
+        }
+    }
+
+    if ($name === '') {
+        return DEFAULT_PROVIDER;
+    }
+    if (!isset(PROVIDERS[$name])) {
+        fail(503, 'The assistant is not configured correctly.', 'unknown provider "' . $name . '"; expected one of ' . implode(', ', array_keys(PROVIDERS)));
+    }
+    return $name;
+}
+
+define('PROVIDER', providerName());
+define('MODEL', PROVIDERS[PROVIDER]['model']);
+define('ENDPOINT', PROVIDERS[PROVIDER]['endpoint']);
+define('REASONING_EFFORT', PROVIDERS[PROVIDER]['reasoning_effort']);
+
 /* ------------------------------------------------------------------ the key */
 
 function apiKey(): string
 {
-    $fromEnv = getenv('GROQ_API_KEY');
+    $provider = PROVIDERS[PROVIDER];
+
+    $fromEnv = getenv($provider['key_env']);
     if (is_string($fromEnv) && trim($fromEnv) !== '') {
         return trim($fromEnv);
     }
@@ -80,7 +148,7 @@ function apiKey(): string
     $docRoot = (string) ($_SERVER['DOCUMENT_ROOT'] ?? __DIR__);
 
     // One level above the document root: served by nothing, cloned by nothing.
-    $path = dirname($docRoot) . '/private/groq.key';
+    $path = privateDir() . '/' . $provider['key_file'];
     if (is_readable($path)) {
         $key = trim((string) file_get_contents($path));
         if ($key !== '') {
@@ -98,7 +166,7 @@ function apiKey(): string
     // tweak stands between the key and the public, and nothing would ever
     // report that. Refusing makes the insecure arrangement visible instead of
     // comfortable.
-    $inWebRoot = $docRoot . '/private/groq.key';
+    $inWebRoot = $docRoot . '/private/' . $provider['key_file'];
     if (@is_readable($inWebRoot)) {
         fail(
             503,
@@ -107,7 +175,7 @@ function apiKey(): string
         );
     }
 
-    fail(503, 'The assistant is not configured yet.', 'no API key in GROQ_API_KEY or ' . $path);
+    fail(503, 'The assistant is not configured yet.', 'no API key in ' . $provider['key_env'] . ' or ' . $path);
 }
 
 /* ------------------------------------------------------- rate and budget */
@@ -258,9 +326,9 @@ $request = [
     // Zero, not 0.2. Every answer here is a lookup in the brief, and there is
     // no question on this site whose best answer comes from sampling.
     'temperature' => 0,
-    // gpt-oss reasons before it answers, and those tokens come out of both the
-    // daily allowance and the output ceiling. Grounded lookup needs very little
-    // of it and the allowance is the binding constraint.
+    // Both wired-in models reason before they answer, and those tokens come
+    // out of both the daily allowance and the output ceiling. Grounded lookup
+    // needs very little of it; the level is set per provider above.
     'reasoning_effort' => REASONING_EFFORT,
 ];
 
@@ -339,7 +407,8 @@ $dayNow = bumpWindow($dayKey, $charge, 86400);
 $minNow = bumpWindow($minKey, $charge, 60);
 
 error_log(sprintf(
-    'chat.php usage: prompt=%d completion=%d reasoning=%d total=%d%s finish=%s day=%s/%d minute=%s/%d',
+    'chat.php usage: provider=%s prompt=%d completion=%d reasoning=%d total=%d%s finish=%s day=%s/%d minute=%s/%d',
+    PROVIDER,
     $promptTokens,
     $completionTokens,
     $reasoningTokens,
@@ -373,6 +442,7 @@ if ($reply === '') {
 
 echo json_encode([
     'reply' => $reply,
+    'provider' => PROVIDER,
     'model' => MODEL,
     // Diagnostics rather than secrets: they carry no content, and without them
     // a truncated reply is indistinguishable from a complete one. dev/eval.mjs
