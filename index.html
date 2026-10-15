@@ -258,11 +258,24 @@ footer a:hover{color:var(--band-accent);}
   border-radius:999px;padding:.35rem .7rem;cursor:pointer;}
 .chip-btn:hover{color:var(--ink);border-color:var(--rule-2);}
 .ask-form{display:flex;gap:.6rem;flex-wrap:wrap;}
-.ask-form input{flex:1 1 16rem;min-width:0;font:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);
+.ask-form input{flex:1 1 9rem;min-width:0;font:inherit;font-size:.95rem;color:var(--ink);background:var(--surface);
   border:1px solid var(--rule-2);border-radius:var(--r-sm);padding:.6rem .8rem;}
 .ask-form input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 .ask-form button[disabled]{opacity:.55;cursor:default;}
 .ask-note{margin:.9rem 0 0;font-size:.8rem;color:var(--ink-3);}
+/* Voice. Both buttons stay hidden until the script finds the browser can do
+   the job, so a browser without speech support never shows a dead control. */
+.ask-mic,.ask-voice{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;font:inherit;cursor:pointer;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--rule-2);border-radius:var(--r-sm);}
+.ask-mic{width:2.75rem;padding:0;}
+.ask-mic[hidden],.ask-voice[hidden]{display:none;}
+.ask-mic:hover,.ask-voice:hover{color:var(--ink);}
+.ask-mic.is-listening{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);animation:ask-pulse 1.2s ease-in-out infinite;}
+@keyframes ask-pulse{50%{box-shadow:0 0 0 6px var(--accent-wash);}}
+@media (prefers-reduced-motion:reduce){.ask-mic.is-listening{animation:none;}}
+.ask-voice{height:30px;padding:0 .6rem;font-size:.75rem;border-color:var(--rule);margin-left:auto;}
+.ask-voice:not([hidden]) + .ask-close{margin-left:0;}
+.ask-voice[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media (max-width:560px){ .ask{padding:1.1rem;} .ask-log .from-you{max-width:100%;} }
 
 /* ---- assistant: nav trigger, floating button, panel ---------------------- */
@@ -1042,6 +1055,14 @@ html.intro-on, html.intro-on body{overflow:hidden;}
       <h2 id="ask-panel-title">Ask about my work</h2>
       <p>Grounded in the resume and the lab write-ups on this page &mdash; nothing else.</p>
     </div>
+    <button type="button" class="ask-voice" id="ask-voice" aria-pressed="false" hidden
+            title="Read answers aloud">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+      </svg>
+      <span id="ask-voice-label">Voice off</span>
+    </button>
     <button type="button" class="ask-close" id="ask-close" aria-label="Close the assistant">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
@@ -1064,6 +1085,12 @@ html.intro-on, html.intro-on body{overflow:hidden;}
       <label class="skip" for="ask-input">Your question</label>
       <input type="text" id="ask-input" name="q" maxlength="600"
              placeholder="Ask about the experience, the labs, or a technology&hellip;">
+      <button type="button" class="ask-mic" id="ask-mic" aria-label="Ask by voice" aria-pressed="false" hidden>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+        </svg>
+      </button>
       <button type="submit" class="btn btn-primary" id="ask-send">Ask</button>
     </form>
 
@@ -1165,11 +1192,144 @@ html.intro-on, html.intro-on body{overflow:hidden;}
     return el;
   }
 
-  function ask(question) {
+  /* ---- voice ------------------------------------------------------------
+     Both directions use what the browser already has: SpeechRecognition to
+     hear the question, speechSynthesis to say the answer. No audio reaches
+     this site's server and no second provider is involved, so voice adds no
+     key, no bill and no new place a visitor's words are kept. Recognition is
+     Chrome, Edge and Safari; Firefox has none, and there the mic is simply
+     never shown. Text stays the primary channel: every spoken answer is also
+     on screen, because a reply that is only heard cannot be checked. */
+
+  var voiceBtn   = document.getElementById('ask-voice');
+  var voiceLabel = document.getElementById('ask-voice-label');
+  var mic        = document.getElementById('ask-mic');
+  var synth      = window.speechSynthesis || null;
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  var voiceOn    = false;
+  var listening  = null;
+
+  function setVoice(on) {
+    voiceOn = !!on;
+    voiceBtn.setAttribute('aria-pressed', voiceOn ? 'true' : 'false');
+    voiceLabel.textContent = voiceOn ? 'Voice on' : 'Voice off';
+    if (!voiceOn) hush();
+  }
+
+  function hush() { if (synth) synth.cancel(); }
+
+  // The voices list fills in asynchronously on Chrome, so it is read at the
+  // moment of speaking, not once at load. A natural or neural English voice
+  // where the platform has one; otherwise whatever English voice exists.
+  function pickVoice() {
+    var all = synth.getVoices().filter(function (v) { return /^en(-|_|$)/i.test(v.lang); });
+    var rank = function (v) {
+      return (/natural|neural|online/i.test(v.name) ? 4 : 0)
+           + (/google|microsoft|samantha|daniel/i.test(v.name) ? 2 : 0)
+           + (/en-(us|gb)/i.test(v.lang) ? 1 : 0);
+    };
+    all.sort(function (a, b) { return rank(b) - rank(a); });
+    return all[0] || null;
+  }
+
+  // What is read differs from what is shown in one way: a URL read aloud is
+  // forty seconds of letters. It stays on screen; the voice points at it.
+  function forSpeech(text) {
+    return plain(text)
+      .replace(/https?:\/\/\S+/g, 'the link on screen')
+      .replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, function (m) { return m.replace('@', ' at ').replace(/\./g, ' dot '); })
+      .replace(/^\s*[-*]\s+/gm, '');
+  }
+
+  function speak(text) {
+    if (!synth || !voiceOn) return;
+    hush();
+    var voice = pickVoice();
+    // One utterance per sentence. Chrome silently stops a single long
+    // utterance at around fifteen seconds, mid-word, with no error event.
+    var parts = forSpeech(text).match(/[^.!?\n]+[.!?]*\s*/g) || [];
+    parts.forEach(function (s) {
+      s = s.trim();
+      if (!s) return;
+      var u = new SpeechSynthesisUtterance(s);
+      if (voice) { u.voice = voice; u.lang = voice.lang; }
+      u.rate = 1.02;
+      synth.speak(u);
+    });
+  }
+
+  if (synth && typeof SpeechSynthesisUtterance === 'function') {
+    voiceBtn.hidden = false;
+    voiceBtn.addEventListener('click', function () { setVoice(!voiceOn); });
+    synth.getVoices();   // asks Chrome to start loading the list now
+  }
+
+  function stopListening() {
+    if (listening) { try { listening.abort(); } catch (e) {} }
+    listening = null;
+    mic.classList.remove('is-listening');
+    mic.setAttribute('aria-pressed', 'false');
+    mic.setAttribute('aria-label', 'Ask by voice');
+  }
+
+  if (Recognition && window.isSecureContext) {
+    mic.hidden = false;
+    mic.addEventListener('click', function () {
+      if (listening) { listening.stop(); return; }   // stop() still delivers what was heard
+      if (busy) return;
+      hush();
+      var rec = new Recognition();
+      rec.lang = 'en-US';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 1;
+      var finalText = '';
+      var before = input.value;
+
+      rec.onresult = function (e) {
+        var interim = '';
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          var t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalText += t; else interim += t;
+        }
+        input.value = (finalText + interim).trim() || before;
+      };
+      rec.onerror = function (e) {
+        stopListening();
+        input.value = before;
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          add('The microphone is blocked for this page. You can allow it in the browser\'s address bar, or type the question instead.', 'is-problem');
+        } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          add('Voice input did not work this time (' + e.error + '). Typing works too.', 'is-problem');
+        }
+      };
+      rec.onend = function () {
+        var q = finalText.trim();
+        stopListening();
+        if (q) {
+          // Speaking a question is the clearest sign the visitor wants to
+          // hear the answer, so it turns voice replies on. They can turn it
+          // off again with the button in the header.
+          if (synth && !voiceOn) setVoice(true);
+          input.value = '';
+          ask(q, true);
+        }
+      };
+
+      listening = rec;
+      mic.classList.add('is-listening');
+      mic.setAttribute('aria-pressed', 'true');
+      mic.setAttribute('aria-label', 'Stop listening');
+      try { rec.start(); } catch (e) { stopListening(); }
+    });
+  }
+
+  function ask(question, spoken) {
     if (busy || !question) return;
     busy = true;
     send.disabled = true;
     if (suggest) suggest.hidden = true;
+    hush();
 
     add(question, 'from-you');
     var pending = add('Thinking…', 'from-bot');
@@ -1177,7 +1337,9 @@ html.intro-on, html.intro-on body{overflow:hidden;}
     fetch('chat.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: question, history: history.slice(-8) })
+      // voice asks the endpoint for an answer short enough to listen to. It
+      // is sent whenever answers will be read aloud, typed question or not.
+      body: JSON.stringify({ message: question, history: history.slice(-8), voice: voiceOn || !!spoken })
     })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .then(function (res) {
@@ -1189,6 +1351,7 @@ html.intro-on, html.intro-on body{overflow:hidden;}
           return;
         }
         pending.textContent = plain(res.body.reply);
+        speak(res.body.reply);
         // History keeps the model's own wording, markers and all. That is what
         // it actually said, and stripping formatting from its own context would
         // quietly edit the conversation it is reasoning over.
@@ -1250,6 +1413,8 @@ html.intro-on, html.intro-on body{overflow:hidden;}
 
   function closeAsk() {
     if (panel.hidden) return;
+    hush();            // a closed panel must not keep talking
+    stopListening();
     panel.hidden = true;
     fab.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('ask-open');

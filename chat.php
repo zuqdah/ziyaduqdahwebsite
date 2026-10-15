@@ -80,6 +80,17 @@ const DEFAULT_PROVIDER   = 'groq';
 const MAX_OUTPUT_TOKENS  = 400;   // keeps replies tight; see the truncation log below before raising it. A provider row may raise it.
 const MAX_INPUT_CHARS    = 600;   // a question, not a pasted document
 const MAX_HISTORY_TURNS  = 4;     // enough to follow up, bounded so context cannot grow without limit
+
+/*
+ * Added after the brief when the page will read the answer aloud. A reply that
+ * reads well at 150 words is a minute of listening, and a listener cannot skim.
+ * It sits after the brief, never inside it, so the brief stays the same bytes on
+ * every call and its cache prefix still holds.
+ */
+const VOICE_NOTE = "This answer will be read aloud by a text-to-speech voice as well as shown on screen. "
+    . "Answer in two to four short spoken sentences, under 70 words. No lists, no URLs, no symbols that read badly aloud. "
+    . "Name a lab in plain words rather than spelling its repository name. "
+    . "If more detail would help, offer it in one short closing sentence instead of giving it.";
 const PER_IP_LIMIT       = 12;    // messages per window, per visitor
 const PER_IP_WINDOW      = 900;   // 15 minutes
 const DAILY_LIMIT        = 300;   // site-wide requests, under the provider's 1,000
@@ -350,6 +361,8 @@ foreach (array_slice($history, -(MAX_HISTORY_TURNS * 2)) as $turn) {
 
 $messages[] = ['role' => 'user', 'content' => $message];
 
+define('VOICE', ($body['voice'] ?? false) === true);
+
 /* ------------------------------------------------------------------ call */
 
 /**
@@ -379,7 +392,10 @@ function buildRequest(array $messages): array
             // The brief is the same bytes on every call, so it is marked as a
             // cache prefix. Below the model's minimum cacheable size this is a
             // silent no-op, which is fine: it costs nothing either way.
-            'system'     => [['type' => 'text', 'text' => $brief, 'cache_control' => ['type' => 'ephemeral']]],
+            'system'     => array_merge(
+                [['type' => 'text', 'text' => $brief, 'cache_control' => ['type' => 'ephemeral']]],
+                VOICE ? [['type' => 'text', 'text' => VOICE_NOTE]] : []
+            ),
             'messages'   => $turns,
             // Thinking is left at its default (adaptive); the depth is the
             // provider's effort setting. No temperature: this model rejects
@@ -387,6 +403,10 @@ function buildRequest(array $messages): array
             // does not need one.
             'output_config' => ['effort' => REASONING_EFFORT],
         ];
+    }
+
+    if (VOICE) {
+        $messages[0]['content'] .= "\n\n" . VOICE_NOTE;
     }
 
     return [
