@@ -363,6 +363,17 @@ html.intro-on, html.intro-on body{overflow:hidden;}
    recruiter looking at a dark screen. ?intro forces it past those preferences. */
 (function(){
   var force=/[?&]intro\b/.test(location.search);
+  /* ?intro-debug (which also forces the intro) writes what the video actually
+     did onto the page, for phones, where there is no console to read. */
+  var log=function(){};
+  if(/[?&]intro-debug\b/.test(location.search)){
+    var t0=Date.now(), pane=document.createElement('pre');
+    pane.setAttribute('style','position:fixed;left:8px;right:8px;top:8px;z-index:101;max-height:45vh;overflow:auto;margin:0;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.88);color:#9FE8DA;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;');
+    document.body.appendChild(pane);
+    log=function(m){ pane.textContent+=((Date.now()-t0)/1000).toFixed(2)+'s  '+m+'\n'; };
+    log(navigator.userAgent);
+    log('hidden='+document.hidden+' reducedMotion='+!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)+' saveData='+!!(navigator.connection&&navigator.connection.saveData)+' viewport='+innerWidth+'x'+innerHeight);
+  }
   /* The once-per-browser version left this flag behind; nothing reads it now. */
   try{ localStorage.removeItem('zu-intro-v1'); }catch(e){}
   if(!force && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){return;}
@@ -382,6 +393,7 @@ html.intro-on, html.intro-on body{overflow:hidden;}
 
   var done=false;
   function finish(){
+    log('finish alreadyDone='+done);
     if(done){return;} done=true;
     box.classList.add('is-leaving'); root.classList.remove('intro-on');
     setTimeout(function(){ v.pause(); v.removeAttribute('src'); v.load(); if(box.parentNode){box.parentNode.removeChild(box);} },650);
@@ -394,6 +406,7 @@ html.intro-on, html.intro-on body{overflow:hidden;}
      it would only fail again. */
   var watchdog=0;
   function standDown(canOffer){
+    log('standDown canOffer='+canOffer+' alreadyDone='+done);
     if(done){return;} done=true; clearTimeout(watchdog);
     root.classList.remove('intro-on'); if(box.parentNode){box.parentNode.removeChild(box);}
     if(canOffer===true){offer();}
@@ -419,9 +432,14 @@ html.intro-on, html.intro-on body{overflow:hidden;}
       if(offered!==b){return;}
       var cta=document.querySelector('.hero .cta');
       if(cta){cta.appendChild(b);}
+      log('offer placed='+!!cta);
     }
     if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',place);}else{place();}
   }
+
+  ['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough','play','playing','pause','waiting','stalled','suspend','abort','emptied','error','ended'].forEach(function(name){
+    v.addEventListener(name,function(){ log(name+'  readyState='+v.readyState+' networkState='+v.networkState+' t='+v.currentTime.toFixed(2)+' paused='+v.paused+(name==='error'&&v.error?' code='+v.error.code+' '+(v.error.message||''):'')); });
+  });
 
   var started=false;
   v.addEventListener('playing',function(){ started=true; });
@@ -434,9 +452,13 @@ html.intro-on, html.intro-on body{overflow:hidden;}
   function go(){
     if(document.hidden||done){return;}
     document.removeEventListener('visibilitychange',go);
-    watchdog=setTimeout(function(){ if(!started){standDown(true);} },3500);
-    var p=v.play(); if(p&&p.catch){p.catch(function(){ standDown(true); });}
+    watchdog=setTimeout(function(){ log('watchdog fired, started='+started); if(!started){standDown(true);} },3500);
+    log('play() called');
+    var p=v.play();
+    if(p&&p.then){p.then(function(){ log('play() resolved'); },function(e){ log('play() rejected: '+(e&&e.name)+' '+(e&&e.message)); standDown(true); });}
+    else{ log('play() returned no promise'); }
   }
+  document.addEventListener('visibilitychange',function(){ log('visibilitychange hidden='+document.hidden); });
   if(document.hidden){document.addEventListener('visibilitychange',go);}else{go();}
 
   skip.addEventListener('click',finish);
