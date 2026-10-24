@@ -347,6 +347,10 @@ nav.main .navlink-btn:hover{color:var(--ink);}
 .intro-ctl button:hover{border-color:#5EEAD4;color:#5EEAD4;}
 .intro-ctl button:focus-visible{outline:2px solid #5EEAD4;outline-offset:2px;}
 html.intro-on, html.intro-on body{overflow:hidden;}
+/* Shown beside the hero's buttons only when the browser refused to start the
+   intro by itself. A <button> does not inherit line-height, so without this it
+   sits 4px shorter than the two links it lines up with. */
+.intro-offer{line-height:inherit;}
 </style>
 </head>
 <body>
@@ -382,12 +386,47 @@ html.intro-on, html.intro-on body{overflow:hidden;}
     box.classList.add('is-leaving'); root.classList.remove('intro-on');
     setTimeout(function(){ v.pause(); v.removeAttribute('src'); v.load(); if(box.parentNode){box.parentNode.removeChild(box);} },650);
   }
-  function standDown(){ if(done){return;} done=true; root.classList.remove('intro-on'); if(box.parentNode){box.parentNode.removeChild(box);} }
+  /* canOffer: the browser would not start the film by itself, but a tap would
+     count as permission. iPhones in Low Power Mode refuse every autoplay, and
+     so do in-app browsers (LinkedIn, Gmail) and some desktop settings. Those
+     visitors get the page as before, plus a button beside the hero's buttons
+     that plays the intro on a tap. A file that failed to load gets no button:
+     it would only fail again. */
+  var watchdog=0;
+  function standDown(canOffer){
+    if(done){return;} done=true; clearTimeout(watchdog);
+    root.classList.remove('intro-on'); if(box.parentNode){box.parentNode.removeChild(box);}
+    if(canOffer===true){offer();}
+  }
+
+  var offered=null;
+  function offer(){
+    if(offered){return;}
+    var b=document.createElement('button'); b.type='button'; b.className='btn btn-ghost intro-offer';
+    b.textContent='\u25B6\uFE0E Play intro'; b.setAttribute('aria-label','Play the 19-second intro');
+    b.addEventListener('click',function(){
+      if(b.parentNode){b.parentNode.removeChild(b);} offered=null;
+      done=false; started=false; box.classList.remove('is-leaving');
+      document.body.appendChild(box); root.classList.add('intro-on');
+      /* play() inside the tap itself, not after a timer: the permission a tap
+         grants does not survive being deferred. */
+      var p=v.play(); if(p&&p.catch){p.catch(function(){ standDown(true); });}
+      try{skip.focus({preventScroll:true});}catch(e){}
+    });
+    offered=b;
+    /* The refusal can arrive before the parser has reached the hero. */
+    function place(){
+      if(offered!==b){return;}
+      var cta=document.querySelector('.hero .cta');
+      if(cta){cta.appendChild(b);}
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',place);}else{place();}
+  }
 
   var started=false;
   v.addEventListener('playing',function(){ started=true; });
   v.addEventListener('ended',finish);
-  v.addEventListener('error',standDown);
+  v.addEventListener('error',function(){ standDown(false); });
   /* The watchdog and the play() call wait until the tab is on screen. A page
      opened in a background tab -- a middle-click from LinkedIn or a search
      result -- is not allowed to start media, and timing out there would
@@ -395,8 +434,8 @@ html.intro-on, html.intro-on body{overflow:hidden;}
   function go(){
     if(document.hidden||done){return;}
     document.removeEventListener('visibilitychange',go);
-    setTimeout(function(){ if(!started){standDown();} },3500);
-    var p=v.play(); if(p&&p.catch){p.catch(standDown);}
+    watchdog=setTimeout(function(){ if(!started){standDown(true);} },3500);
+    var p=v.play(); if(p&&p.catch){p.catch(function(){ standDown(true); });}
   }
   if(document.hidden){document.addEventListener('visibilitychange',go);}else{go();}
 
