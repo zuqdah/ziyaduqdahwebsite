@@ -128,6 +128,30 @@ function judgeSeats(assigned, included) {
   const paid = Math.max(0, Number(assigned) - Number(included));
   return { paid, ok: paid === 0, monthly: paid * 6 };
 }
+// ------------------------------------------------------------ the assistant
+// Added 2026-10-25. Since 2026-10-09 the live assistant answers from Claude
+// Haiku 5.5 on prepaid credit, with Groq's free tier as an automatic fallback.
+// An empty balance or a revoked key therefore no longer shows to a visitor as
+// an error -- the fallback answers -- so the only way to notice is to ask.
+// This must match the word in private/assistant.provider on the server; that
+// file is outside the repository, so it is restated here.
+const ASSISTANT_URL = 'https://ziyaduqdah.com/chat.php';
+const EXPECTED_PROVIDER = 'anthropic';
+
+function judgeAssistant(status, body) {
+  if (status !== 200 || !body || typeof body.reply !== 'string' || !body.reply.trim()) {
+    return { answered: false, why: 'HTTP ' + status + (body && body.error ? ': ' + body.error : '') };
+  }
+  return {
+    answered: true,
+    fromExpected: body.provider === EXPECTED_PROVIDER && !body.fallback_from,
+    complete: body.finish_reason === 'stop',
+    provider: body.provider,
+    fallbackFrom: body.fallback_from || null,
+    finish: body.finish_reason,
+  };
+}
+
 function judgeSpend(total30, lastThreeDays) {
   return {
     underCeiling: Number(total30) <= MONTHLY_CEILING_USD,
@@ -177,6 +201,12 @@ check(judgeSpend(6.61, 1.74).idle === false && judgeSpend(18, 1.74).underCeiling
   'the spend check catches a steady daily charge, and a month over the ceiling', JSON.stringify(judgeSpend(6.61, 1.74)));
 check(judgeSpend(0.8, 0.0006).idle === true && judgeSpend(0.8, 0.0006).underCeiling === true,
   'the spend check passes an idle month');
+check(judgeAssistant(200, { reply: 'He works at US Cloud.', provider: 'anthropic', fallback_from: null, finish_reason: 'stop' }).fromExpected === true,
+  'the assistant check passes an answer from the configured provider');
+check(judgeAssistant(200, { reply: 'He works at US Cloud.', provider: 'groq', fallback_from: 'anthropic', finish_reason: 'stop' }).fromExpected === false,
+  'the assistant check catches an answer that came from the fallback');
+check(judgeAssistant(503, { error: 'The assistant is unavailable.' }).answered === false,
+  'the assistant check catches no answer at all');
 
 // ============================================================ 1. local suites
 start('Local test suites');
@@ -431,6 +461,44 @@ start('Spend and licences');
         'largest: ' + top);
       check(verdict.idle, 'nothing is billing day after day (' + lastThree.toFixed(2) + ' USD over the last three complete days)',
         'an idle lab estate costs a fraction of a cent a day; largest over thirty days: ' + top);
+    }
+  }
+}
+
+// ======================================================== 8. the assistant
+// One real question to the live assistant. It costs about a twentieth of a
+// cent and counts against the site's own daily ceiling like any visitor's.
+start('The site assistant answers, from the provider it is meant to');
+{
+  let status = 0;
+  let body = null;
+  let failure = null;
+  try {
+    const res = await fetch(ASSISTANT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'drift-check' },
+      body: JSON.stringify({ message: 'Where does Ziyad work now?' }),
+    });
+    status = res.status;
+    body = await res.json().catch(() => null);
+  } catch (e) {
+    failure = String(e && e.message ? e.message : e);
+  }
+
+  if (failure) {
+    unknown('asked the live assistant a question', failure);
+  } else if (status === 429) {
+    // The site's own limits refused before any provider was asked: that says
+    // nothing about the provider, so it is not a pass and not a drift.
+    unknown('asked the live assistant a question', 'HTTP 429: ' + ((body && body.error) || 'rate limited'));
+  } else {
+    const v = judgeAssistant(status, body);
+    check(v.answered, 'the live assistant answered', v.why);
+    if (v.answered) {
+      check(v.fromExpected, 'the answer came from ' + EXPECTED_PROVIDER + ', not a fallback',
+        'answered by ' + v.provider + (v.fallbackFrom ? ' after ' + v.fallbackFrom + ' failed' : '')
+          + '. Most likely the Anthropic credit balance is empty or the key was revoked; the server log has a FALLBACK line with the reason.');
+      check(v.complete, 'the answer was not cut off', 'finish_reason=' + v.finish);
     }
   }
 }
