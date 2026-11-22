@@ -54,6 +54,9 @@ const record = (state, label, detail) => results.push({ section, state, label, d
 const pass = (label) => record('ok', label);
 const drift = (label, detail) => record('drift', label, detail);
 const unknown = (label, detail) => record('unknown', label, detail);
+// Something worth knowing that is not wrong: printed with its detail, left out
+// of the exit code. Paused nightly cleanups are the first use.
+const note = (label, detail) => record('note', label, detail);
 const check = (ok, label, detail) => (ok ? pass(label) : drift(label, detail));
 
 // -------------------------------------------------------------------- helpers
@@ -152,6 +155,18 @@ function judgeAssistant(status, body) {
   };
 }
 
+// GitHub pauses a scheduled workflow in a public repository after 60 days
+// without a commit, and says so by email only. The paused workflow's last run
+// is still its last success, so the "most recent run succeeded" check passes
+// straight through it. Paused is expected for a finished lab -- re-enable just
+// before running that lab's drill -- so it is a note, not a drift. Disabled by
+// hand is different: somebody chose that, and it should be said out loud.
+function judgeWorkflowState(state) {
+  if (state === 'active') return 'running';
+  if (state === 'disabled_inactivity') return 'paused';
+  return 'off';
+}
+
 function judgeSpend(total30, lastThreeDays) {
   return {
     underCeiling: Number(total30) <= MONTHLY_CEILING_USD,
@@ -207,6 +222,9 @@ check(judgeAssistant(200, { reply: 'He works at US Cloud.', provider: 'groq', fa
   'the assistant check catches an answer that came from the fallback');
 check(judgeAssistant(503, { error: 'The assistant is unavailable.' }).answered === false,
   'the assistant check catches no answer at all');
+check(judgeWorkflowState('active') === 'running' && judgeWorkflowState('disabled_inactivity') === 'paused'
+  && judgeWorkflowState('disabled_manually') === 'off',
+  'the workflow check tells running, paused for inactivity, and switched off apart');
 
 // ============================================================ 1. local suites
 start('Local test suites');
@@ -355,6 +373,8 @@ start('Workflows: nothing is quietly failing');
 {
   const failing = [];
   const unread = [];
+  const paused = [];
+  const off = [];
   let inspected = 0;
   for (const repo of repoDirs) {
     const name = path.basename(repo);
@@ -364,6 +384,21 @@ start('Workflows: nothing is quietly failing');
     const runs = await get('https://api.github.com/repos/' + slug + '/actions/runs?per_page=30', true);
     if (runs.error || !runs.body || !Array.isArray(runs.body.workflow_runs)) { unread.push(name + ' (' + (runs.error || 'unexpected response') + ')'); continue; }
     inspected++;
+
+    // Only workflows with a schedule can be paused for inactivity, and only
+    // those are safety nets nobody triggers by hand.
+    const wf = await get('https://api.github.com/repos/' + slug + '/actions/workflows?per_page=100', true);
+    if (wf.error || !wf.body || !Array.isArray(wf.body.workflows)) {
+      unread.push(name + ' workflow list (' + (wf.error || 'unexpected response') + ')');
+    } else {
+      for (const w of wf.body.workflows) {
+        const file = read(path.join(repo, String(w.path || '').split('@')[0]));
+        if (!file || !/^\s*schedule\s*:/m.test(file)) continue;
+        const verdict = judgeWorkflowState(w.state);
+        if (verdict === 'paused') paused.push(name + ' / ' + w.name);
+        if (verdict === 'off') off.push(name + ' / ' + w.name + ' (' + w.state + ')');
+      }
+    }
     // The latest COMPLETED run of each workflow is the one that says whether it works now.
     const latest = new Map();
     for (const run of runs.body.workflow_runs) {
@@ -381,6 +416,13 @@ start('Workflows: nothing is quietly failing');
   if (unread.length) unknown('read the workflow history of every repository', unread.join('; '));
   else pass('read the workflow history of every repository (' + inspected + ')');
   check(failing.length === 0, 'the most recent run of every workflow succeeded', failing.join('; '));
+  check(off.length === 0, 'no scheduled workflow has been switched off by hand', off.join('; '));
+  if (paused.length) {
+    note(paused.length + ' scheduled workflow(s) paused by GitHub after 60 days without a commit',
+      paused.join('; ') + '. Expected for a finished lab. Before running that lab\'s drill: gh workflow enable <name> --repo zuqdah/<lab>');
+  } else {
+    pass('no scheduled workflow is paused');
+  }
 }
 
 // ===================================================== 7. spend and licences
@@ -507,15 +549,17 @@ start('The site assistant answers, from the provider it is meant to');
 let current = '';
 for (const r of results) {
   if (r.section !== current) { current = r.section; console.log('\n' + current); }
-  const tag = r.state === 'ok' ? 'ok     ' : r.state === 'drift' ? 'DRIFT  ' : 'UNKNOWN';
+  const tag = r.state === 'ok' ? 'ok     ' : r.state === 'drift' ? 'DRIFT  ' : r.state === 'note' ? 'note   ' : 'UNKNOWN';
   console.log('  ' + tag + ' ' + r.label + (r.state !== 'ok' && r.detail ? '\n          ' + r.detail : ''));
 }
 
 const drifted = results.filter((r) => r.state === 'drift').length;
 const unknowns = results.filter((r) => r.state === 'unknown').length;
 const okay = results.filter((r) => r.state === 'ok').length;
+const notes = results.filter((r) => r.state === 'note').length;
 console.log('\n' + '-'.repeat(72));
-console.log('  ' + okay + ' agree; ' + drifted + ' drifted; ' + unknowns + ' could not be checked.');
+console.log('  ' + okay + ' agree; ' + drifted + ' drifted; ' + unknowns + ' could not be checked'
+  + (notes ? '; ' + notes + ' note(s), which do not count against the run' : '') + '.');
 if (drifted) console.log('  Something has drifted. Nothing was changed.');
 else if (unknowns) console.log('  Nothing is known to have drifted, but that is not the same as clean.');
 else console.log('  Everything agrees.');
