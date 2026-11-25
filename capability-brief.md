@@ -48,7 +48,7 @@ recipient, Francis T. Edwards Award for Scholastic Achievement.
 - **Migration:** estate discovery, dependency mapping, wave planning, cutover,
   and tested rollback. Datacenter transitions for production SaaS.
 
-## The seventeen public labs
+## The eighteen public labs
 
 Each is deployed against the live platform it is about, verified, then torn
 down -- most the same day, and the two that cannot be are said so below. Every
@@ -129,6 +129,19 @@ found in itself. All are at github.com/zuqdah.
     Databricks CLI does not return the event-log field that carries any of
     these numbers, so read through the CLI a violated pipeline is
     indistinguishable from one that declared nothing.
+18. **the-upgrade-succeeded** — an AKS node pool upgrade, done the way a
+    Terraform-managed cluster does it, that Azure reported as Succeeded and
+    Terraform as Apply complete while 181 of 3,180 requests to the app on it
+    failed, in two outages of about 30 seconds, one per node drained. The same
+    upgrade on the same cluster, with the same app and pool settings, then
+    failed 0 of 3,517 requests; only the Kubernetes manifest differed (a
+    readiness probe, a PodDisruptionBudget, spreading replicas across nodes, a
+    preStop pause). The run found what the prediction ranked too low: the
+    scheduler had put both "redundant" replicas on the same node, twice, so
+    each drain took both. Built with Terraform on a free-tier cluster with
+    Entra ID sign-in, Azure RBAC and no local admin account, driven by GitHub
+    Actions over OIDC, and graded by Pester-tested code that reports Unknown,
+    never a pass, unless it can prove the upgrade actually drained the nodes.
 
 ## Where to point a reader first
 
@@ -157,6 +170,8 @@ what the reader cares about, using the descriptions above:
   then sql-migration-with-rollback.
 - Data engineering and data quality: the-rows-that-failed-and-loaded-anyway,
   then the-second-run-changed-nothing.
+- Kubernetes, AKS and platform upgrades: the-upgrade-succeeded, then
+  azure-agent-landing-zone.
 
 If the reader has given no clue what they care about, offer two or three of
 these routes and ask which one fits, rather than picking for them.
